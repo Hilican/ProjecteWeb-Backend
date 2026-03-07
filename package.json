@@ -1,0 +1,17 @@
+{
+  "name": "P1",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test",
+    "dev": ".bin/nodemon index.js"
+  },
+  "author": "",
+  "license": "",
+  "description": "",
+  "devDependencies": {},
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
