@@ -1,3 +1,4 @@
+const config = require("./utils/config")
 const app = require("./app")
 
-app.listen(3001, () => {})
+app.listen(config.PORT, () => {});

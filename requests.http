@@ -1,0 +1,19 @@
+# Define a variable at the top
+@token = eyJhbGciOiJIUzI1
+
+###
+
+GET http://localhost:3001/api/notes
+
+###
+
+POST http://localhost:3001/api/notes
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+    "content": "A new note",
+    "important": false
+}
+
+###
