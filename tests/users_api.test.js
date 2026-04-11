@@ -5,6 +5,7 @@ const assert = require("node:assert")
 const app = require("../app");
 const { usersModel } = require("../models")
 const db = require("../utils/db");
+const testHelper = require("./helper");
 
 const api = supertest(app);
 
@@ -12,17 +13,10 @@ const api = supertest(app);
 describe('Create users tests', () => {
     beforeEach(async () => {
         db.exec('DELETE FROM users')
-
-        const userUser = {
-            username: "user",
-            passwordHash: await bcrypt.hash("3", 10),
-            email: "user@example.com",
-            role: "user"
-        }
-        usersModel.createUser(userUser)
+        usersModel.createUser(await testHelper.getDataToCreateUser(testHelper.userData))
     });
 
-    test('creation succeeds with a fresh username', async () => {
+    test('creation succeeds with a fresh username (only user, cant select role, no logInRequired)', async () => {
         const newUser = {
             username: "newUser",
             password: "mypsswd",
@@ -94,43 +88,14 @@ describe('Create users tests', () => {
 describe('Create users tests (one for each role)', () => {
     beforeEach(async () => {
         db.exec('DELETE FROM users')
-
-        const rootUser = {
-            username: "root",
-            passwordHash: await bcrypt.hash("root1", 10),
-            email: "root@example.com",
-            role: "admin"
-        };
-        const organizerUser = {
-            username: "organizer",
-            passwordHash: await bcrypt.hash("organizer1", 10),
-            email: "organizer@example.com",
-            role: "organizer"
-        }
-        const userUser = {
-            username: "user",
-            passwordHash: await bcrypt.hash("user1", 10),
-            email: "user@example.com",
-            role: "user"
-        }
-        usersModel.createUser(rootUser)
-        usersModel.createUser(organizerUser)
-        usersModel.createUser(userUser)
+        usersModel.createUser(await testHelper.getDataToCreateUser(testHelper.adminData))
+        usersModel.createUser(await testHelper.getDataToCreateUser(testHelper.organizerData))
+        usersModel.createUser(await testHelper.getDataToCreateUser(testHelper.userData))
     });
 
     test('admin creates SpecialUser successfully', async () => {
-        const logInData = {
-            username: 'root',
-            password: 'root1'
-        }
-        
-        const result = await api
-            .post('/api/login')
-            .send(logInData)
-            .expect(200)
-            .expect('Content-Type', /application\/json/)
-
-        const token = result.body.token
+        const temp = await testHelper.loginHelper(api, testHelper.getLoginData(testHelper.adminData))
+        const token = temp.body.token
         
         //Same applies create another admin, since the unique thing that changes is the role String
         const newUser = {
@@ -152,17 +117,7 @@ describe('Create users tests (one for each role)', () => {
     })
 
     test('No admin creates SpecialUser unsuccessfully', async () => {
-        const logInData = {
-            username: 'organizer',
-            password: 'organizer1'
-        }
-        
-        const temp = await api
-            .post('/api/login')
-            .send(logInData)
-            .expect(200)
-            .expect('Content-Type', /application\/json/)
-
+        const temp = await testHelper.loginHelper(api, testHelper.getLoginData(testHelper.organizerData))
         const token = temp.body.token
         
         const usersAtStart = usersModel.getAllUsers()
@@ -194,17 +149,7 @@ describe('Create users tests (one for each role)', () => {
     })
 
     test('Admin modifies user information successfully', async () => {
-        const logInData = {
-            username: 'root',
-            password: 'root1'
-        }
-        
-        const temp = await api
-            .post('/api/login')
-            .send(logInData)
-            .expect(200)
-            .expect('Content-Type', /application\/json/)
-
+        const temp = await testHelper.loginHelper(api, testHelper.getLoginData(testHelper.adminData))
         const token = temp.body.token
         
         const user = usersModel.getUserByUsername('user')

@@ -5,6 +5,8 @@ const assert = require("node:assert")
 const app = require("../app");
 const { usersModel, videogamesModel, tournamentsModel } = require("../models")
 const db = require("../utils/db");
+const testHelper = require("./helper");
+
 
 const api = supertest(app);
 
@@ -12,40 +14,16 @@ describe('simple interactions with tournament list', () => {
     before(async () => {
         db.exec('DELETE FROM users')
         db.exec('DELETE FROM videogames')
-        const rootUser = {
-            username: "root",
-            passwordHash: await bcrypt.hash("root1", 10),
-            email: "root@example.com",
-            role: "admin"
-        };
-        const organizerUser = {
-            username: "organizer",
-            passwordHash: await bcrypt.hash("organizer1", 10),
-            email: "organizer@example.com",
-            role: "organizer"
-        }
-        const userUser = {
-            username: "user",
-            passwordHash: await bcrypt.hash("user1", 10),
-            email: "user@example.com",
-            role: "user"
-        }
-
-        const videogame1 = { 
-            name: "COD:BO2", 
-            description: "Patata", 
-        }
-
-        usersModel.createUser(rootUser)
-        usersModel.createUser(organizerUser)
-        usersModel.createUser(userUser)
-        videogamesModel.addVideogame(videogame1)
+        usersModel.createUser(await testHelper.getDataToCreateUser(testHelper.adminData))
+        usersModel.createUser(await testHelper.getDataToCreateUser(testHelper.organizerData))
+        usersModel.createUser(await testHelper.getDataToCreateUser(testHelper.userData))
+        videogamesModel.addVideogame(testHelper.videogameData)
     });
 
     beforeEach(async () => {
         db.exec('DELETE FROM tournaments')
-        const organizer = await usersModel.getUserByUsername("organizer")
-        const videogame = await videogamesModel.getVideogameByName("COD:BO2")
+        const organizer = await usersModel.getUserByUsername(testHelper.organizerData.username)
+        const videogame = await videogamesModel.getVideogameByName(testHelper.videogameData.name)
         const tournament = { 
             name: "tournament1",
             description: "description1",
@@ -97,28 +75,10 @@ describe('simple interactions with tournament list', () => {
     })
 
     test('Organizer creates one tournaments', async () => {
-        const logInData = {
-            username: 'organizer',
-            password: 'organizer1'
-        }
-        
-        const temp = await api
-            .post('/api/login')
-            .send(logInData)
-            .expect(200)
-            .expect('Content-Type', /application\/json/)
-
+        const temp = await testHelper.loginHelper(api, testHelper.getLoginData(testHelper.organizerData))
         const token = temp.body.token
 
-        const newTournament = { 
-            name: "tournament4",
-            description: "description1",
-            videogame: "COD:BO2",
-            type: "torneig",
-            rounds: 3,
-            tournament_start_date: "2023-01-01",
-            tournament_end_date: "2023-01-02",
-        }
+        const newTournament = testHelper.tournamentData
     
         const result =await api
             .post('/api/tournaments')
@@ -133,28 +93,10 @@ describe('simple interactions with tournament list', () => {
     })
 
     test('Non organizer fails to create one tournament', async () => {
-        const logInData = {
-            username: 'root',
-            password: 'root1'
-        }
-        
-        const result = await api
-            .post('/api/login')
-            .send(logInData)
-            .expect(200)
-            .expect('Content-Type', /application\/json/)
+        const temp = await testHelper.loginHelper(api, testHelper.getLoginData(testHelper.adminData))
+        const token = temp.body.token
 
-        const token = result.body.token
-        
-        const newTournament = { 
-            name: "tournament4",
-            description: "description1",
-            videogame: "COD:BO2",
-            type: "torneig",
-            rounds: 3,
-            tournament_start_date: "2023-01-01",
-            tournament_end_date: "2023-01-02",
-        }
+        const newTournament = testHelper.tournamentData
         
         await api
             .post('/api/tournaments')
@@ -163,18 +105,8 @@ describe('simple interactions with tournament list', () => {
             .expect(401)
     })
 
-    test('Organizer changes tournament registration state successfully', async () => {
-        const logInData = {
-            username: 'organizer',
-            password: 'organizer1'
-        }
-        
-        const temp = await api
-            .post('/api/login')
-            .send(logInData)
-            .expect(200)
-            .expect('Content-Type', /application\/json/)
-
+    test('Organizer changes his tournament registration state successfully', async () => {
+        const temp = await testHelper.loginHelper(api, testHelper.getLoginData(testHelper.organizerData))
         const token = temp.body.token
         
         let tournament = tournamentsModel.getTournamentByName('tournament1')
@@ -199,22 +131,13 @@ describe('simple interactions with tournament list', () => {
         
         assert.strictEqual(result.body.message, "Tournament updated successfully")
         assert.strictEqual(tournament.stateRegistration, "PerObrir")
+        //Actualizar el torneo para que tenga el nuevo estado
         tournament = tournamentsModel.getTournamentByName('tournament1')
         assert.strictEqual(tournament.stateRegistration, "Oberta")
     })
 
     test('User registers and unregisters from a tournament', async () => {
-        const logInData = {
-            username: 'user',
-            password: 'user1'
-        }
-        
-        const temp = await api
-            .post('/api/login')
-            .send(logInData)
-            .expect(200)
-            .expect('Content-Type', /application\/json/)
-
+        const temp = await testHelper.loginHelper(api, testHelper.getLoginData(testHelper.userData))
         const token = temp.body.token
         
         let tournament = tournamentsModel.getTournamentByName('ToRegister')

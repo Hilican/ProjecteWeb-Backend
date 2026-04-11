@@ -5,33 +5,18 @@ const assert = require("node:assert")
 const app = require("../app");
 const { usersModel } = require("../models")
 const db = require("../utils/db");
+const testHelper = require("./helper");
 
 const api = supertest(app);
 
 describe('LogIn', () => {
     beforeEach(async () => {
         db.exec('DELETE FROM users')
-
-        const userUser = {
-            username: "user",
-            passwordHash: await bcrypt.hash("user1", 10),
-            email: "user@example.com",
-            role: "user"
-        }
-        usersModel.createUser(userUser)
+        usersModel.createUser(await testHelper.getDataToCreateUser(testHelper.userData))
     });
 
     test('login succeeds with correct credentials', async () => {
-        const logInData = {
-            username: 'user',
-            password: 'user1'
-        }
-        
-        const result = await api
-            .post('/api/login')
-            .send(logInData)
-            .expect(200)
-            .expect('Content-Type', /application\/json/)
+        const result = await testHelper.loginHelper(api, testHelper.getLoginData(testHelper.userData), 200)
 
         // Comprobamos que nos devuelve un token
         assert(result.body.token !== undefined)
@@ -39,27 +24,18 @@ describe('LogIn', () => {
     })
 
     test('login fails with wrong credentials', async () => {
-        const logInData = {
+        const BadPassword = {
             username: 'user',
             password: 'user2'
         }
 
-        const logInData1 = {
+        const WrongAlwaysSame = {
             username: 'Siempre mandara el mismo mensaje',
-            password: 'porque no comprueba si existe usuario'
+            password: 'Solo dice mal o bien'
         }
         
-        const result = await api
-            .post('/api/login')
-            .send(logInData)
-            .expect(401)
-            .expect('Content-Type', /application\/json/)
-
-        const result1 = await api
-            .post('/api/login')
-            .send(logInData1)
-            .expect(401)
-            .expect('Content-Type', /application\/json/)
+        const result = await testHelper.loginHelper(api, BadPassword, 401)
+        const result1 = await testHelper.loginHelper(api, WrongAlwaysSame, 401)
 
         assert(result.body.error.includes('invalid username or password'))
         assert(result1.body.error.includes('invalid username or password'))
