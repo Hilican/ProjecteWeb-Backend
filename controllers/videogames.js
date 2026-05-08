@@ -1,6 +1,8 @@
 const jwt = require("jsonwebtoken");
 const videogamesRouter = require('express').Router()
 const { videogamesModel } = require('../models')
+const { decryptToken } = require("../utils/middleware")
+const { hasAll, getExistingParameters } = require("../utils/helper");
 
 videogamesRouter.get("/", (request, response) => {
     try {
@@ -24,65 +26,58 @@ videogamesRouter.get("/:id", (request, response) => {
     }
 })
 
-const getTokenFrom = request => {
-    const authorization = request.get("authorization")
-    if (authorization && authorization.startsWith("Bearer ")) {
-        return authorization.replace("Bearer ", "")
-    }
-    return null
-}
-
-videogamesRouter.post("/", (request, response) => {
+// --- REQUIRE AUTHENTICATION FOR THE ROUTES BELOW ---
+videogamesRouter.post("/", decryptToken, async (request, response) => {
     try {
-            const decodedToken = jwt.verify(getTokenFrom(request), process.env.SECRET)
-            if(!decodedToken.role || decodedToken.role !== "admin") {
-                return response.status(401).json({error: "invalid token"});
-            }
-            
-            const { name, description } = request.body
-            if (!name || !description) {
-                return response.status(400).json({ error: "missing name or description" });
-            }
-            
-            const existName = videogamesModel.getVideogameByName(name)
-            if (existName) {
-                return response.status(400).json({ 
-                    error: 'videogame name already exists' 
-                });
-            }
+        if(request.user.role !== "admin") {
+            return response.status(401).json({error: "invalid token"});
+        }
+        
+        const allowedFields = ['name', 'description'];
+        if (!hasAll(allowedFields, request)) {
+            return response.status(400).json({ 
+                error: "Missing data", 
+                message: `At least one of these fields is required`,
+                validFields: allowedFields
+            });
+        }
+        const { name , description} = request.body
+        const existName = videogamesModel.getVideogameByName(name)
+        if (existName) {
+            return response.status(400).json({ 
+                error: 'name already on use' 
+            });
+        }
 
-            const videogame = {
-                name: name,
-                description: description,
-            };
-            
-            const savedVideogame = videogamesModel.addVideogame(videogame)
-            response.status(201).json(savedVideogame)
-        } catch (err) {
-            if (err.name === 'JsonWebTokenError') {
-                return response.status(401).json({ err: 'invalid token' });
-            }
-            console.error(err);
-            response.status(500).json({ error: 'something went wrong' });
+        const videogame = {
+            name: name,
+            description: description,
+        };
+        
+        const savedVideogame = videogamesModel.addVideogame(videogame)
+        response.status(201).json(savedVideogame)
+    } catch (err) {
+        console.error(err);
+        response.status(500).json({ error: 'something went wrong' });
     }
 })
 
-videogamesRouter.delete("/:id", (request, response) => {
-    const id = request.params.id
+videogamesRouter.delete("/:id", decryptToken, (request, response) => {
     try {
-            const decodedToken = jwt.verify(getTokenFrom(request), process.env.SECRET)
-            if(!decodedToken.role || decodedToken.role !== "admin") {
-                return response.status(401).json({error: "invalid token"});
-            }
-    
-            videogamesModel.deleteVideogame(id)
-            response.status(204).end()
-        } catch (err) {
-            if (err.name === 'JsonWebTokenError') {
-                return response.status(401).json({ err: 'invalid token' });
-            }
-            console.error(err);
-            response.status(500).json({ error: 'something went wrong' });
+        const id = request.params.id
+        if(!videogamesModel.getVideogameById(id)) {
+            return response.status(404).json({ error: 'videogame not found' });
+        }
+
+        if(request.user.role !== "admin") {
+            return response.status(401).json({error: "only admins can delete videogames"});
+        }
+
+        videogamesModel.deleteVideogame(id)
+        response.status(204).end()
+    } catch (err) {
+        console.error(err);
+        response.status(500).json({ error: 'something went wrong' });
     }
 })
 

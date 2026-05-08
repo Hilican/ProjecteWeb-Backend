@@ -1,5 +1,7 @@
 const router = require("express").Router()
 const { tournamentsModel, videogamesModel, gamesModel, usersModel} = require("../models")
+const { decryptToken } = require("../utils/middleware")
+const { getExistingParameters, hasAll, supportedTypes, createGames } = require("../utils/helper");
 
 router.get("/", (request, response) => {
     try {
@@ -73,56 +75,59 @@ router.get('/:id/games/:gameId', (request, response) => {
     }
 })
 
-const getTokenFrom = request => {
-    const authorization = request.get("authorization")
-    if (authorization && authorization.startsWith("Bearer ")) {
-        return authorization.replace("Bearer ", "")
-    }
-    return null
-}
+// --- REQUIRE AUTHENTICATION FOR THE ROUTES BELOW ---
 
-const jwt = require("jsonwebtoken");
-
-router.post("/", (request, response) => {
-    try {
-        const decodedToken = jwt.verify(getTokenFrom(request), process.env.SECRET)
-    
-        if(!decodedToken.id || !decodedToken.role) {
-            return response.status(401).json({error: "invalid token"});
+router.post("/", decryptToken, (request, response) => {
+    try { 
+        //Check if the user is an organizer, only organizers can create tournaments
+        if(request.user.role !== "organizer") {
+            return response.status(401).json({error: "Only organizers can create a tournaments"});
         }
         
-        if(decodedToken.role !== "organizer") {
-            return response.status(401).json({error: "invalid token"});
-        }
-    
-        if (Object.keys(request.body).length !== 7) {
+        //Check if all fields are in the body of the request
+        const allowedFields = [
+            "name", 
+            "description", 
+            "videogame", 
+            "type", 
+            "rounds", 
+            "tournament_start_date", 
+            "tournament_end_date"
+        ];
+        
+        if (!hasAll(allowedFields, request)) {
             return response.status(400).json({ error: "All fields are required" });
         }
-    
-        const videogame = videogamesModel.getVideogameByName(request.body.videogame)  
+        
+        //Checking if game exists
+        const videogame = videogamesModel.getVideogameByName(request.body.videogame)
         if (!videogame) {
-            return response.status(404).json({ error: "Video game not found" });
+            return response.status(400).json({ 
+                error: 'videogame not found' 
+            });
         }
-    
-        //No se especifica pero lo añado porque me parece mas logico que este
+        // Making sure special fields obey the rules
+        //No se pide pero lo añado porque me parece mas logico que el nombre del torneo sea unico
         const tempTournament = tournamentsModel.getTournamentByName(request.body.name)  
         if (tempTournament) {
             return response.status(400).json({ 
                 error: 'tournament name must be unique' 
             });
         }
-    
-        const allowedStates = ["torneig"];
-        if (!allowedStates.includes(request.body.type)) {
-            return response.status(400).json({ error: "This type of tournament isn't supported" });
+        
+        //Por ahora solo se puede crear el tipo "torneig"
+        if (!supportedTypes.includes(request.body.type)) {
+            return response.status(400).json({ 
+                error: 'This type of tournament isn\'t supported' 
+            });
         }
     
         if (request.body.rounds < 0) {
             return response.status(400).json({ error: "Rounds must be a positive number" });
         }
-    
-        if (request.body.type > 30) {
-            return response.status(400).json({ error: "Tournament type must be a number between 1 and 30" });
+
+        if (request.body.rounds > 30) {
+            return response.status(400).json({ error: "Rounds must be less than 30" });
         }
     
         const tournament = { 
@@ -133,26 +138,11 @@ router.post("/", (request, response) => {
             rounds: request.body.rounds,
             tournament_start_date: request.body.tournament_start_date,
             tournament_end_date: request.body.tournament_end_date,
-            organizer: decodedToken.id
+            organizer: request.user.id
         }
 
         const createdTournament = tournamentsModel.createTournament(tournament)
-
-        if(createdTournament.type === "torneig")
-        {
-            const totalRounds = createdTournament.rounds;
-            // Recorremos desde la ronda 1 hasta la N
-            for (let round = 1; round <= totalRounds; round++) {
-                // Calculamos cuántos partidos hay en esta ronda (2 elevado a la ronda-1)
-                // Ejemplo: Ronda 1 = 1 partido, Ronda 2 = 2, Ronda 3 = 4...
-                const gamesInRound = Math.pow(2, round - 1);
-
-                for (let i = 1; i <= gamesInRound; i++) {
-                    // Creamos el partido en la base de datos
-                    gamesModel.createGame(createdTournament.id, round);
-                }
-            }
-        }
+        createGames(createdTournament.type, createdTournament.rounds, createdTournament.id);
         response.status(201).json({createdTournament, 
             message: "Tournament and brackets generated successfully"
         })
@@ -161,7 +151,7 @@ router.post("/", (request, response) => {
     }
 })
 
-router.delete("/:id", (request, response) => {
+router.delete("/:id", decryptToken, (request, response) => {
     const id = request.params.id
 
     const tournament = tournamentsModel.getTournamentById(id)
@@ -169,10 +159,8 @@ router.delete("/:id", (request, response) => {
         return response.status(404).json({ error: "tournament not found" });
     }
 
-    const decodedToken = jwt.verify(getTokenFrom(request), process.env.SECRET)
-
-    if(!decodedToken.id || decodedToken.id !== tournament.orgnitzador) {
-        return response.status(401).json({error: "invalid token"});
+    if(request.user.id !== tournament.orgnitzador) {
+        return response.status(401).json({error: "Only the organizer can delete this tournament"});
     }
 
     try {
@@ -184,63 +172,61 @@ router.delete("/:id", (request, response) => {
 })
 
 
-router.patch("/:id", (request, response) => {
+router.patch("/:id", decryptToken, (request, response) => {
     try {
+        // Check tournament existence
         const {id} = request.params
-
         const tournament = tournamentsModel.getTournamentById(id)
         if (!tournament) {
             return response.status(404).json({ error: "tournament not found" });
         }
-        
-        const decodedToken = jwt.verify(getTokenFrom(request), process.env.SECRET)
-        if(!decodedToken.id || !decodedToken.role || decodedToken.role !== "organizer") {
-            return response.status(401).json({error: "invalid token"});
-        }
 
-        if (decodedToken.id !== tournament.organizer) {
+        //Check that the user is the owner
+        if (request.user.id !== tournament.organizer) {
             return response.status(403).json({ error: "Only the creator can modify this tournament" });
         }
-        const { 
-            description, 
-            videogame, 
-            type, 
-            tournament_start_date, 
-            tournament_end_date, 
-            stateRegistration,
-            stateTournament,
-        } = request.body;
-        
-        if (Object.keys(request.body).length === 0) {
-            return response.status(400).json({ error: "At least one field is required" });
+
+        // Check if at least one field is provided, so the change needs to be made
+        const allowedFields = [
+            'description', 'videogame', 'type', 
+            'tournament_start_date', 'tournament_end_date', 
+            'stateRegistration', 'stateTournament'
+        ];
+
+        const existingParameters = getExistingParameters(allowedFields, request);
+
+        if (!existingParameters) {
+            return response.status(400).json({ 
+                error: "Missing data", 
+                message: `At least one of these fields is required`,
+                validFields: allowedFields
+            });
         }
 
-        if (stateRegistration !== undefined) {
+        // Making sure special fields obey the rules
+        if (existingParameters.stateRegistration !== undefined) {
             const allowedStates = ["PerObrir", "Oberta", "Tancada"];
-            if (!allowedStates.includes(stateRegistration)) {
-                return response.status(400).json({ error: "New state registration not allowed" });
+            if (!allowedStates.includes(existingParameters.stateRegistration)) {
+                return response.status(400).json({ error: "New 'state registration' not allowed" });
             }
         }
 
-
-        if (stateTournament !== undefined) {
+        if (existingParameters.stateTournament !== undefined) {
             const allowedStates = ["Anunciat", "inscripcions obertes", "en curs", "finalitzat"];
-            if (!allowedStates.includes(stateTournament)) {
-                return response.status(400).json({ error: "New state tournament not allowed" });
+            if (!allowedStates.includes(existingParameters.stateTournament)) {
+                return response.status(400).json({ error: "New 'state tournament' not allowed" });
             }
         }
 
-        const body = {
-            description: description || tournament.description,
-            videogame: videogame || tournament.videogame,
-            type: type || tournament.type,
-            tournament_start_date: tournament_start_date || tournament.tournament_start_date,
-            tournament_end_date: tournament_end_date || tournament.tournament_end_date,
-            stateRegistration: stateRegistration || tournament.stateRegistration,
-            stateTournament: stateTournament || tournament.stateTournament
-        }
+        // With the torunament from database as a base, we update the fields that are in the body of the request
+        // And make the change in the database
+        allowedFields.forEach(field => {
+            if (request.body[field] !== undefined) {
+                tournament[field] = request.body[field];
+            }
+        });
 
-        const result = tournamentsModel.changeTournamentState(id, body)
+        const result = tournamentsModel.changeTournamentState(id, tournament)
         if (!result) {
             return response.status(404).json({ error: "Could not update: Tournament not found" });
         }
@@ -256,12 +242,12 @@ router.patch("/:id", (request, response) => {
     } 
 })
 
-router.patch("/:id/games/:gameId", (request, response) => {
+router.patch("/:id/games/:gameId", decryptToken, (request, response) => {
     try {
         const {id, gameId} = request.params
         const tournament = tournamentsModel.getTournamentById(id)
         if (!tournament) {
-            return response.status(404).json({ error: "tournament not found" });
+            return response.status(404).json({ error: "Tournament not found" });
         }
         const tournamentGame = gamesModel.getGameById(gameId)
         if (!tournamentGame) {
@@ -272,12 +258,7 @@ router.patch("/:id/games/:gameId", (request, response) => {
             return response.status(404).json({ error: "game not found in this tournament" });
         }
         
-        const decodedToken = jwt.verify(getTokenFrom(request), process.env.SECRET)
-        if(!decodedToken.id || !decodedToken.role || decodedToken.role !== "organizer") {
-            return response.status(401).json({error: "invalid token"});
-        }
-
-        if (decodedToken.id !== tournament.organizer) {
+        if (request.user.role !== "organizer" || request.user.id !== tournament.organizer) {
             return response.status(403).json({ error: "Only the creator can modify this tournament" });
         }
 
@@ -285,46 +266,56 @@ router.patch("/:id/games/:gameId", (request, response) => {
             return response.status(400).json({ error: "At least one field is required" });
         }
 
-        const { 
-            state,
-            player1, 
-            player2, 
-            result,
-        } = request.body;
+        //Check that fields exist
+        const allowedFields = [
+            'state', 
+            'player1', 
+            'player2', 
+            'result',
+        ];
 
-        if (state !== undefined) {
+        const existingParameters = getExistingParameters(allowedFields, request);
+        if (!existingParameters) {
+            return response.status(400).json({ 
+                error: "Missing data", 
+                message: `At least one of these fields is required`,
+                validFields: allowedFields
+            });
+        }
+
+        if (existingParameters.state) {
             const allowedStates = ["pendiente", "confirmado", "finalizado"];
-            if (!allowedStates.includes(state)) {
+            if (!allowedStates.includes(existingParameters.state)) {
                 return response.status(400).json({ error: "New state not allowed" });
             }
         }
 
-        if (result !== undefined) {
+        if (existingParameters.result) {
             const allowedStates = [tournamentGame.player1, tournamentGame.player2, null];
-            if (!allowedStates.includes(result)) {
+            if (!allowedStates.includes(existingParameters.result)) {
                 return response.status(400).json({ error: "New result not allowed" });
             }
         }
 
-        if (player1 !== undefined) {
-            const userPlayer1 = usersModel.getUserById(player1)
+        if (existingParameters.player1) {
+            const userPlayer1 = usersModel.getUserById(existingParameters.player1)
             if (!userPlayer1) {
                 return response.status(400).json({ error: "Player 1 not found" });
             }
         }
 
-        if (player2 !== undefined) {
-            const userPlayer2 = usersModel.getUserById(player2)
+        if (existingParameters.player2) {
+            const userPlayer2 = usersModel.getUserById(existingParameters.player2)
             if (!userPlayer2) {
                 return response.status(400).json({ error: "Player 2 not found" });
             }
         }
 
         const body = {
-            state: state || tournamentGame.state,
-            player1: player1 || tournamentGame.player1,
-            player2: player2 || tournamentGame.player2,
-            result: result || tournamentGame.result,
+            state: existingParameters.state || tournamentGame.state,
+            player1: existingParameters.player1 || tournamentGame.player1,
+            player2: existingParameters.player2 || tournamentGame.player2,
+            result: existingParameters.result || tournamentGame.result,
         }
 
         const resultSQL = gamesModel.modifyGame(gameId, body)
@@ -343,7 +334,7 @@ router.patch("/:id/games/:gameId", (request, response) => {
     } 
 })
 
-router.post("/:id/register", (request, response) => {
+router.post("/:id/register", decryptToken, (request, response) => {
     try {
         const id = request.params.id
 
@@ -356,17 +347,11 @@ router.post("/:id/register", (request, response) => {
             return response.status(400).json({ error: "registration is not open" });
         }
 
-        const decodedToken = jwt.verify(getTokenFrom(request), process.env.SECRET)
-
-        if(!decodedToken.id || !decodedToken.role) {
-            return response.status(401).json({error: "invalid token"});
-        }
-
-        if (decodedToken.role !== "user") {
+        if (request.user.role !== "user") {
             return response.status(403).json({ error: "only users can register to tournaments" });
         }
 
-        tournamentsModel.registerOnTournament(id, decodedToken.id)
+        tournamentsModel.registerOnTournament(id, request.user.id)
         response.status(201).json({ message: "User registered to tournament successfully" })
     }catch(err) {
         // Si el error viene de JWT, es un problema de autenticación (401)
@@ -384,10 +369,9 @@ router.post("/:id/register", (request, response) => {
     } 
 })
 
-router.delete('/:id/participants/:userId', (request, response) => {
+router.delete('/:id/participants/:userId', decryptToken, (request, response) => {
     try {
-        const id = request.params.id
-        const userId = request.params.userId
+        const {id, userId} = request.params
         const tournament = tournamentsModel.getTournamentById(id)
         if (!tournament) {
             return response.status(404).json({ error: "tournament not found" });
@@ -398,8 +382,7 @@ router.delete('/:id/participants/:userId', (request, response) => {
             return response.status(404).json({ error: "user not registered in tournament" });
         }
 
-        const decodedToken = jwt.verify(getTokenFrom(request), process.env.SECRET)
-        if(!decodedToken.id || !decodedToken.role) {
+        if(!request.user.id || !request.user.role) {
             return response.status(401).json({error: "invalid token"});
         }
 
@@ -407,7 +390,7 @@ router.delete('/:id/participants/:userId', (request, response) => {
         const userIdNum = Number(userId);
         const organizerId = Number(tournament.organizer);
 
-        if (decodedToken.id !== organizerId && decodedToken.id !== userIdNum) {
+        if (request.user.id !== organizerId && request.user.id !== userIdNum) {
             return response.status(403).json({ error: "You can't unregister this user" });
         }
 

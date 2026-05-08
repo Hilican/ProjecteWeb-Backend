@@ -50,7 +50,7 @@ describe('Create users tests', () => {
             .expect(400)
             .expect('Content-Type', /application\/json/)
 
-        assert(result.body.error.includes('username must be unique'))
+        assert(result.body.error.includes('username already on use'))
 
         const usersAtEnd = usersModel.getAllUsers()
         assert.strictEqual(usersAtEnd.length, usersAtStart.length)
@@ -156,11 +156,11 @@ describe('Create users tests (one for each role)', () => {
 
         const toModify = {
             newPassword: "mypsswd",
-            email: "newOrganizer@example.com",
+            newEmail: "newOrganizer@example.com",
         }
         
         const result = await api
-            .patch(`/api/users/${user.id}/changeInfo`)
+            .patch(`/api/users/${user.id}`)
             .set('Authorization', `Bearer ${token}`)
             .send(toModify)
             .expect(200)
@@ -168,7 +168,7 @@ describe('Create users tests (one for each role)', () => {
 
         //Without token
         await api
-            .patch(`/api/users/${user.id}/changeInfo`)
+            .patch(`/api/users/${user.id}`)
             .send(toModify)
             .expect(401)
             .expect('Content-Type', /application\/json/)

@@ -1,7 +1,10 @@
+require('dotenv').config();
+
 const bcrypt = require('bcrypt')
-const jwt = require("jsonwebtoken");
 const usersRouter = require("express").Router()
 const { usersModel } = require("../models")
+const { hasAll, getExistingParameters } = require("../utils/helper");
+const { decryptToken } = require("../utils/middleware")
 
 usersRouter.get("/", (request, response) => {
     try {
@@ -14,31 +17,42 @@ usersRouter.get("/", (request, response) => {
 
 //Podria ser el /signUp, lo dejo asi por simplificacion
 usersRouter.post("/createUser", async (request, response) => {
-    const { username, password, email } = request.body
+    //Check if all fields are in the body of the request
+    const allowedFields = [
+        "username",
+        "password",
+        "email"
+    ];
 
-    const saltRounds = 10;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
-
-    if (!username || !password || !email) {
-        return response.status(400).json({ error: "missing username, password or/and email" });
+    if (!hasAll(allowedFields, request)) {
+        return response.status(400).json({ 
+            error: "All fields are required",
+            fields: allowedFields
+        });
     }
 
-    const existsUsername = usersModel.getUserByUsername(username);
+    const { username, password, email } = request.body
 
+    //Check unique variables aren't taken
+    const existsUsername = usersModel.getUserByUsername(username);
     if (existsUsername) {
         return response.status(400).json({ 
-            error: 'username must be unique' 
+            error: 'username already on use' 
         });
     }
 
     const existsEmail = usersModel.getUserByEmail(email);
-
     if (existsEmail) {
         return response.status(400).json({ 
             error: 'email already on use' 
         });
     }
+    
+    // Create password hash
+    const saltRounds = parseInt(process.env.SALT_ROUNDS, 10);
+    const passwordHash = await bcrypt.hash(password, saltRounds);
 
+    // Create the user
     const user = {
         username: username,
         passwordHash: passwordHash,
@@ -63,106 +77,106 @@ usersRouter.get("/:id", (request, response) => {
     }
 })
 
-const getTokenFrom = request => {
-    const authorization = request.get("authorization")
-    if (authorization && authorization.startsWith("Bearer ")) {
-        return authorization.replace("Bearer ", "")
+// --- REQUIRE AUTHENTICATION FOR THE ROUTES BELOW ---
+usersRouter.post("/createSpecialUser", decryptToken, async (request, response) => {
+    //Check who is doing this is an admin
+    if(request.user.role !== "admin") {
+        return response.status(401).json({error: "invalid token"});
     }
-    return null
-}
 
-usersRouter.post("/createSpecialUser", async (request, response) => {
+    //Check if all fields are in the body of the request
+    const allowedFields = [
+        "username",
+        "password",
+        "email",
+        "role"
+    ];
 
-    try {
-        const decodedToken = jwt.verify(getTokenFrom(request), process.env.SECRET)
-        if(!decodedToken.role || decodedToken.role !== "admin") {
-            return response.status(401).json({error: "invalid token"});
-        }
-
-        const { username, password, email, role } = request.body
-        if (!username || !password || !email || !role) {
-            return response.status(400).json({ error: "missing username, password, email or/and role" });
-        }
-
-        const existsUsername = usersModel.getUserByUsername(username);
-
-        if (existsUsername) {
-            return response.status(400).json({ 
-                error: 'username must be unique' 
-            });
-        }
-
-        const existsEmail = usersModel.getUserByEmail(email);
-
-        if (existsEmail) {
-            return response.status(400).json({ 
-                error: 'email already on use' 
-            });
-        }
-
-        const saltRounds = 10;
-        const passwordHash = await bcrypt.hash(password, saltRounds);
-
-        const user = {
-            username: username,
-            passwordHash: passwordHash,
-            email: email,
-            role: role
-        };
-
-        const savedUser = usersModel.createUser(user);
-        response.status(201).json(savedUser);
-    } catch (err) {
-        if (err.name === 'JsonWebTokenError') {
-            return response.status(401).json({ err: 'invalid token' });
-        }
-        console.error(err);
-        response.status(500).json({ error: 'something went wrong' });
+    if (!hasAll(allowedFields, request)) {
+        return response.status(400).json({ 
+            error: "All fields are required",
+            fields: allowedFields
+        });
     }
+
+    const { username, password, email, role } = request.body
+
+    //Check unique variables aren't taken
+    let exists = usersModel.getUserByUsername(username);
+    if (exists) {
+        return response.status(400).json({ 
+            error: 'username already on use' 
+        });
+    }
+
+    exists = usersModel.getUserByEmail(email);
+    if (exists) {
+        return response.status(400).json({ 
+            error: 'email already on use' 
+        });
+    }
+
+    const saltRounds = parseInt(process.env.SALT_ROUNDS, 10);
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    //Create user
+    const user = {
+        username: username,
+        passwordHash: passwordHash,
+        email: email,
+        role: role
+    };
+
+    const savedUser = usersModel.createUser(user);
+    response.status(201).json(savedUser);
 })
 
-usersRouter.patch("/:id/changeInfo", async (request, response) => {
+usersRouter.patch("/:id", decryptToken, async (request, response) => {
     try {
         const id = request.params.id
-        
-        const {newPassword, newEmail} = request.body;
-        
-        if (!newPassword && !newEmail) {
-            return response.status(400).json({ error: "Nothing to change" });
+
+        //Check if all fields are in the body of the request
+        const allowedFields = ['newPassword', 'newEmail'];
+        const existingParameters = getExistingParameters(allowedFields, request);
+        if (!existingParameters) {
+            return response.status(400).json({ 
+                error: "Missing data", 
+                message: `At least one of these fields is required`,
+                validFields: allowedFields
+            });
         }
 
         const user = usersModel.getSimpleUserById(id)
         if (!user) {
             return response.status(404).json({ error: "user not found" });
         }
-        
-        const decodedToken = jwt.verify(getTokenFrom(request), process.env.SECRET)
-        if(!decodedToken.id || !decodedToken.role) {
-            return response.status(401).json({error: "invalid token"});
+
+        if(request.user.role !== "admin" && request.user.id !== user.id) {
+            return response.status(401).json({error: "you can't update this user"});
         }
 
-        if (decodedToken.role === "admin" || decodedToken.id === user.id) {
-            let passwordHash = null
-            if(newPassword)
-            {
-                const saltRounds = 10;
-                passwordHash = await bcrypt.hash(newPassword, saltRounds);
-            }
-
-            usersModel.updateUser(id, newEmail, passwordHash)
-            return response.status(200).json({ message: "User updated successfully" })
-        }else
+        let passwordHash = null
+        if(existingParameters.newPassword)
         {
-            return response.status(401).json({error: "invalid token"});
-        }
-    }catch(err) {
-        if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
-            return response.status(401).json({ error: 'token missing or invalid' });
+            const saltRounds = parseInt(process.env.SALT_ROUNDS, 10);
+            const passwordHash = await bcrypt.hash(existingParameters.newPassword, saltRounds);
         }
 
+        if(existingParameters.newEmail) {
+            const existEmail = usersModel.getUserByEmail(existingParameters.newEmail);
+            if (existEmail) {
+                return response.status(400).json({ 
+                    error: 'email already on use' 
+                });
+            }
+        }
+        
+        usersModel.updateUser(id, existingParameters.newEmail, passwordHash)
+        return response.status(200).json({ message: "User updated successfully" })
+    } catch (err) {
         console.error(err);
         response.status(500).json({ error: err.message });
-    } 
+    }
 })
 
 module.exports = usersRouter
