@@ -3,7 +3,7 @@ require('dotenv').config();
 const bcrypt = require('bcrypt')
 const usersRouter = require("express").Router()
 const { usersModel } = require("../models")
-const { hasAll, getExistingParameters } = require("../utils/helper");
+const { hasAll, getExistingParameters, getIntParams } = require("../utils/helper");
 const { decryptToken } = require("../utils/middleware")
 
 usersRouter.get("/", (request, response) => {
@@ -65,12 +65,20 @@ usersRouter.post("/createUser", async (request, response) => {
 })
 
 usersRouter.get("/:id", (request, response) => {
-    const id = request.params.id
+    const toTake = [
+        'id',
+    ]; 
     
+    const toTakeList = getIntParams(toTake, request, response);
+    if (!toTakeList) {
+        return;
+    }
+
     try {
-        const user = usersModel.getSimpleUserById(id)
-        
-        if(!user) return response.status(404).end()     
+        const user = usersModel.getUserById(toTakeList.id)
+        if(!user) {
+            return response.status(404).end()
+        }
         response.json(user);
     } catch (err) {
         response.status(500).json({error: err.message})
@@ -127,13 +135,29 @@ usersRouter.post("/createSpecialUser", decryptToken, async (request, response) =
         role: role
     };
 
-    const savedUser = usersModel.createUser(user);
-    response.status(201).json(savedUser);
+    try {
+        const savedUser = await usersModel.createUser(user);
+        return response.status(201).json(savedUser);
+    } catch (error) {
+        console.error("Error al crear usuario:", error);
+        if (err.message.includes('UNIQUE')) {
+            return response.status(400).json({ error: 'user already registered' });
+        }
+
+        return response.status(500).send("Error interno del servidor.");
+    }
 })
 
 usersRouter.patch("/:id", decryptToken, async (request, response) => {
     try {
-        const id = request.params.id
+        const toTake = [
+            'id',
+        ]; 
+        
+        const toTakeList = getIntParams(toTake, request, response);
+        if (!toTakeList) {
+            return;
+        }
 
         //Check if all fields are in the body of the request
         const allowedFields = ['newPassword', 'newEmail'];
@@ -146,7 +170,7 @@ usersRouter.patch("/:id", decryptToken, async (request, response) => {
             });
         }
 
-        const user = usersModel.getSimpleUserById(id)
+        const user = usersModel.getUserById(toTakeList.id)
         if (!user) {
             return response.status(404).json({ error: "user not found" });
         }
@@ -171,7 +195,7 @@ usersRouter.patch("/:id", decryptToken, async (request, response) => {
             }
         }
         
-        usersModel.updateUser(id, existingParameters.newEmail, passwordHash)
+        usersModel.updateUser(toTakeList.id, existingParameters.newEmail, passwordHash)
         return response.status(200).json({ message: "User updated successfully" })
     } catch (err) {
         console.error(err);

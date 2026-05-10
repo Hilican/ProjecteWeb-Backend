@@ -40,9 +40,10 @@ const getUserByEmail = email => {
     return user;
 }
 
+//No password for safety
 const getUserById = id => {
     const q = db.prepare(`
-        SELECT *
+        SELECT id, username, email, role
         FROM users
         WHERE id=?
     `);
@@ -51,9 +52,9 @@ const getUserById = id => {
     return user;
 }
 
-const getSimpleUserById = id => {
+const getAllUserById = id => {
     const q = db.prepare(`
-        SELECT id, username, email, role
+        SELECT *
         FROM users
         WHERE id=?
     `);
@@ -81,4 +82,8 @@ const updateUser = (id, email, passwordHash) => {
         db.prepare(`UPDATE users SET passwordHash = ? WHERE id = ?`).run(passwordHash, id);
     }
 }
-module.exports = { createUser, getUserByUsername, getUserById, getUserByEmail, getSimpleUserById, getAllUsers, updateUser};
+module.exports = { 
+    createUser, updateUser,
+    getUserByUsername, getUserById, getAllUserById, 
+    getUserByEmail, getAllUsers
+};

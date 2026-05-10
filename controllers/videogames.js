@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 const videogamesRouter = require('express').Router()
 const { videogamesModel } = require('../models')
 const { decryptToken } = require("../utils/middleware")
-const { hasAll, getExistingParameters } = require("../utils/helper");
+const { hasAll, getExistingParameters, getIntParams } = require("../utils/helper");
 
 videogamesRouter.get("/", (request, response) => {
     try {
@@ -14,10 +14,17 @@ videogamesRouter.get("/", (request, response) => {
 })
 
 videogamesRouter.get("/:id", (request, response) => {
-    const id = request.params.id
+    const toTake = [
+        'id',
+    ]; 
+    
+    const toTakeList = getIntParams(toTake, request, response);
+    if (!toTakeList) {
+        return;
+    }
     
     try {
-        const game = videogamesModel.getVideogameById(id)
+        const game = videogamesModel.getVideogameById(toTakeList.id)
         
         if(!game) return response.status(404).end()     
         response.json(game);
@@ -64,8 +71,16 @@ videogamesRouter.post("/", decryptToken, async (request, response) => {
 
 videogamesRouter.delete("/:id", decryptToken, (request, response) => {
     try {
-        const id = request.params.id
-        if(!videogamesModel.getVideogameById(id)) {
+        const toTake = [
+            'id',
+        ]; 
+        
+        const toTakeList = getIntParams(toTake, request, response);
+        if (!toTakeList) {
+            return;
+        }
+
+        if(!videogamesModel.getVideogameById(toTakeList.id)) {
             return response.status(404).json({ error: 'videogame not found' });
         }
 
@@ -73,7 +88,7 @@ videogamesRouter.delete("/:id", decryptToken, (request, response) => {
             return response.status(401).json({error: "only admins can delete videogames"});
         }
 
-        videogamesModel.deleteVideogame(id)
+        videogamesModel.deleteVideogame(toTakeList.id)
         response.status(204).end()
     } catch (err) {
         console.error(err);

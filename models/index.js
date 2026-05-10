@@ -46,6 +46,25 @@ const initDb = () => {
             FOREIGN KEY(tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
             
             -- Evita que un usuario se apunte dos veces al mismo torneo
+            -- Se supone que cada usuario que se ponga ya se comprobara que es un user
+            UNIQUE(user_id, tournament_id)
+        )
+    `)
+
+
+    //Modificar para que sea una tabla donde se guarden los organizadores se añaden a cada torneo
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS tournament_organizers(
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER,
+            tournament_id INTEGER,
+            
+            -- Relaciones con las otras tablas
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
+            
+            -- Evita que un organizer se apunte dos veces al mismo torneo
+            -- Se supone que cada usuario que se ponga ya se comprobara que es un organizer
             UNIQUE(user_id, tournament_id)
         )
     `)

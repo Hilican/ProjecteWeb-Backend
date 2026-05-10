@@ -105,6 +105,7 @@ const modifyGame = (id, data) => {
 }
 
 
-module.exports = { getAllGames, getAllGamesFromTournament, getAllGamesFromUser, getGameById, getAllGamesFromTournamentFromUser,
+module.exports = { 
+    getAllGames, getAllGamesFromTournament, getAllGamesFromUser, getGameById, getAllGamesFromTournamentFromUser,
     createGame, removeGame, modifyGame
  };

@@ -1,6 +1,33 @@
 // --- CHECK IF PARAMETRES EXIST ---
 const isValid = value => value !== undefined && value !== null && value !== "";
 
+const getIntParams = (fields, request, response) => {
+    const result = {};
+    let temp;
+    for (const field of fields) {
+        const value = request.params[field];
+        const temp = Number(value);
+
+        if (!Number.isInteger(temp) || temp <= 0) {
+            response.status(400).json({ error: `${field} must be a positive integer` });
+            return null; 
+        }
+        result[field] = temp;
+    }
+    return result;
+};
+
+/*
+    const toTake = [
+        'id',
+    ]; 
+    
+    const toTakeList = getIntParams(toTake, request, response);
+    if (!toTakeList) {
+        return;
+    }
+*/
+
 const getExistingParameters = (allowedFields, request) => {
     const filters = {};
 
@@ -62,4 +89,8 @@ const createGames = (type, rounds, tournamentId) => {
     }
 }
 
-module.exports = { getExistingParameters, hasAll, supportedTypes, createGames };
+module.exports = { 
+    getIntParams, getExistingParameters, hasAll, 
+    // --- TOURNAMENTS HELPERS ---
+    supportedTypes, createGames
+};

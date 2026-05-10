@@ -1,7 +1,7 @@
 const router = require("express").Router()
 const { tournamentsModel, videogamesModel, gamesModel, usersModel} = require("../models")
 const { decryptToken } = require("../utils/middleware")
-const { getExistingParameters, hasAll, supportedTypes, createGames } = require("../utils/helper");
+const { getExistingParameters, hasAll, supportedTypes, createGames, getIntParams } = require("../utils/helper");
 
 router.get("/", (request, response) => {
     try {
@@ -13,10 +13,17 @@ router.get("/", (request, response) => {
 })
 
 router.get('/:id', (request, response) => {
-    const id = request.params.id
+    const toTake = [
+        'id',
+    ]; 
+    
+    const toTakeList = getIntParams(toTake, request, response);
+    if (!toTakeList) {
+        return;
+    }
 
     try {
-        const tournament = tournamentsModel.getTournamentById(id)
+        const tournament = tournamentsModel.getTournamentById(toTakeList.id)
 
         if(!tournament) return response.status(404).end()
 
@@ -27,10 +34,17 @@ router.get('/:id', (request, response) => {
 })
 
 router.get('/:id/participants', (request, response) => {
-    const id = request.params.id
+    const toTake = [
+        'id',
+    ]; 
+    
+    const toTakeList = getIntParams(toTake, request, response);
+    if (!toTakeList) {
+        return;
+    }
 
     try {
-        const tournamentParticipants = tournamentsModel.getTournamentParticipants(id)
+        const tournamentParticipants = tournamentsModel.getTournamentParticipants(toTakeList.id)
         if(!tournament) return response.status(404).end()
         response.json(tournament);
     } catch (err) {
@@ -39,10 +53,17 @@ router.get('/:id/participants', (request, response) => {
 })
 
 router.get('/:id/games', (request, response) => {
-    const id = request.params.id
+    const toTake = [
+        'id',
+    ]; 
+    
+    const toTakeList = getIntParams(toTake, request, response);
+    if (!toTakeList) {
+        return;
+    }
 
     try {
-        const tournamentGames = gamesModel.getAllGamesFromTournament(id)
+        const tournamentGames = gamesModel.getAllGamesFromTournament(toTakeList.id)
         if(!tournamentGames) return response.status(404).end()
         response.json(tournamentGames);
     } catch (err) {
@@ -53,20 +74,27 @@ router.get('/:id/games', (request, response) => {
 router.get('/:id/games/:gameId', (request, response) => {
     
     try {
-        const id = request.params.id
-        const gameId = request.params.gameId
+        const toTake = [
+            'id',
+            'gameId'
+        ]; 
+        
+        const toTakeList = getIntParams(toTake, request, response);
+        if (!toTakeList) {
+            return;
+        }
     
-        const tournament = tournamentsModel.getTournamentById(id)
+        const tournament = tournamentsModel.getTournamentById(toTakeList.id)
         if (!tournament) {
             return response.status(404).json({ error: "tournament not found" });
         }
-        const tournamentGame = gamesModel.getGameById(gameId)
+        const tournamentGame = gamesModel.getGameById(toTakeList.gameId)
         
         if (!tournamentGame) {
             return response.status(404).json({ error: "Game not found" });
         }
 
-        if (Number(tournamentGame.tournamentId) !== Number(id)) {
+        if (tournamentGame.tournamentId !== toTakeList.id) {
             return response.status(404).json({ error: "game not found in this tournament" });
         }
         response.json(tournamentGame);
@@ -76,7 +104,7 @@ router.get('/:id/games/:gameId', (request, response) => {
 })
 
 // --- REQUIRE AUTHENTICATION FOR THE ROUTES BELOW ---
-
+//POST, DELETE AND PATCH FOR TOURNAMENTS
 router.post("/", decryptToken, (request, response) => {
     try { 
         //Check if the user is an organizer, only organizers can create tournaments
@@ -152,19 +180,26 @@ router.post("/", decryptToken, (request, response) => {
 })
 
 router.delete("/:id", decryptToken, (request, response) => {
-    const id = request.params.id
+    const toTake = [
+        'id',
+    ]; 
+    
+    const toTakeList = getIntParams(toTake, request, response);
+    if (!toTakeList) {
+        return;
+    }
 
-    const tournament = tournamentsModel.getTournamentById(id)
+    const tournament = tournamentsModel.getTournamentById(toTakeList.id)
     if (!tournament) {
         return response.status(404).json({ error: "tournament not found" });
     }
 
-    if(request.user.id !== tournament.orgnitzador) {
+    if(request.user.id !== tournament.organizer) {
         return response.status(401).json({error: "Only the organizer can delete this tournament"});
     }
 
     try {
-        tournamentsModel.deleteTournamentById(id)
+        tournamentsModel.deleteTournamentById(toTakeList.id)
         response.status(204).end()
     }catch(err) {
         response.status(500).json({error: err.message})
@@ -175,8 +210,16 @@ router.delete("/:id", decryptToken, (request, response) => {
 router.patch("/:id", decryptToken, (request, response) => {
     try {
         // Check tournament existence
-        const {id} = request.params
-        const tournament = tournamentsModel.getTournamentById(id)
+        const toTake = [
+            'id',
+        ]; 
+        
+        const toTakeList = getIntParams(toTake, request, response);
+        if (!toTakeList) {
+            return;
+        }
+
+        const tournament = tournamentsModel.getTournamentById(toTakeList.id)
         if (!tournament) {
             return response.status(404).json({ error: "tournament not found" });
         }
@@ -226,35 +269,43 @@ router.patch("/:id", decryptToken, (request, response) => {
             }
         });
 
-        const result = tournamentsModel.changeTournamentState(id, tournament)
+        const result = tournamentsModel.changeTournamentState(toTakeList.id, tournament)
         if (!result) {
             return response.status(404).json({ error: "Could not update: Tournament not found" });
         }
 
         response.status(200).json({ message: "Tournament updated successfully" });
     }catch(err) {
-        if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
-            return response.status(401).json({ error: 'token missing or invalid' });
-        }
-
         console.error(err);
         response.status(500).json({ error: err.message });
     } 
 })
 
+//PATCH FOR TOURNAMENT GAMES, to modify/define the result of the game
+//Created/deleted automatically with tournament creation/deletion
 router.patch("/:id/games/:gameId", decryptToken, (request, response) => {
     try {
-        const {id, gameId} = request.params
-        const tournament = tournamentsModel.getTournamentById(id)
+        const toTake = [
+            'id',
+            'gameId'
+        ];
+
+        const toTakeList = getIntParams(toTake, request, response);
+        if (!toTakeList) {
+            return response.status(400).json({ error: "Missing required parameters" });
+        }
+
+        const tournament = tournamentsModel.getTournamentById(toTakeList.id)
         if (!tournament) {
             return response.status(404).json({ error: "Tournament not found" });
         }
-        const tournamentGame = gamesModel.getGameById(gameId)
+
+        const tournamentGame = gamesModel.getGameById(toTakeList.gameId)
         if (!tournamentGame) {
             return response.status(404).json({ error: "Game not found" });
         }
         
-        if (Number(tournamentGame.tournamentId) !== Number(id)) {
+        if (tournamentGame.tournamentId !== toTakeList.id) {
             return response.status(404).json({ error: "game not found in this tournament" });
         }
         
@@ -318,7 +369,7 @@ router.patch("/:id/games/:gameId", decryptToken, (request, response) => {
             result: existingParameters.result || tournamentGame.result,
         }
 
-        const resultSQL = gamesModel.modifyGame(gameId, body)
+        const resultSQL = gamesModel.modifyGame(toTakeList.gameId, body)
         if (!resultSQL) {
             return response.status(400).json({ error: "Could not update" });
         }
@@ -334,11 +385,19 @@ router.patch("/:id/games/:gameId", decryptToken, (request, response) => {
     } 
 })
 
-router.post("/:id/register", decryptToken, (request, response) => {
+//POST, DELETE FOR TOURNAMENTS USER INSCRIPTIONS
+router.post("/:id/participants", decryptToken, (request, response) => {
     try {
-        const id = request.params.id
+        const toTake = [
+            'id',
+        ]; 
+        
+        const toTakeList = getIntParams(toTake, request, response);
+        if (!toTakeList) {
+            return;
+        }
 
-        const tournament = tournamentsModel.getTournamentById(id)
+        const tournament = tournamentsModel.getTournamentById(toTakeList.id)
         if (!tournament) {
             return response.status(404).json({ error: "tournament not found" });
         }
@@ -351,15 +410,11 @@ router.post("/:id/register", decryptToken, (request, response) => {
             return response.status(403).json({ error: "only users can register to tournaments" });
         }
 
-        tournamentsModel.registerOnTournament(id, request.user.id)
+        tournamentsModel.registerUserOnTournament(toTakeList.id, request.user.id)
         response.status(201).json({ message: "User registered to tournament successfully" })
     }catch(err) {
-        // Si el error viene de JWT, es un problema de autenticación (401)
-        if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
-            return response.status(401).json({ error: 'token missing or invalid' });
-        }
-
         // Si el error es de SQLite por intentar apuntarse dos veces (UNIQUE constraint)
+        // Can happen for race conditions
         if (err.message.includes('UNIQUE')) {
             return response.status(400).json({ error: 'user already registered' });
         }
@@ -371,34 +426,118 @@ router.post("/:id/register", decryptToken, (request, response) => {
 
 router.delete('/:id/participants/:userId', decryptToken, (request, response) => {
     try {
-        const {id, userId} = request.params
-        const tournament = tournamentsModel.getTournamentById(id)
+        const toTake = [
+            'id',
+            'userId'
+        ]; 
+        
+        const toTakeList = getIntParams(toTake, request, response);
+        if (!toTakeList) {
+            return;
+        }
+
+        const tournament = tournamentsModel.getTournamentById(toTakeList.id)
         if (!tournament) {
             return response.status(404).json({ error: "tournament not found" });
         }
         
-        const exists = tournamentsModel.isRegistered(id, userId)
-        if (!exists) {
+        const isRegistered = tournamentsModel.isRegistered(toTakeList.id, toTakeList.userId)
+        if (!isRegistered) {
             return response.status(404).json({ error: "user not registered in tournament" });
         }
 
-        if(!request.user.id || !request.user.role) {
-            return response.status(401).json({error: "invalid token"});
-        }
-
-        // Convertimos todo a Number para comparar con seguridad
-        const userIdNum = Number(userId);
-        const organizerId = Number(tournament.organizer);
-
-        if (request.user.id !== organizerId && request.user.id !== userIdNum) {
+        if (request.user.id !== tournament.organizer && request.user.id !== toTakeList.userId) {
             return response.status(403).json({ error: "You can't unregister this user" });
         }
 
-        tournamentsModel.unregisterOnTournament(id, userId)
+        tournamentsModel.unregisterUserFromTournament(toTakeList.id, toTakeList.userId)
         response.json("User unregistered successfully");
     } catch (err) {
         response.status(500).json({error: err.message})
     }
 })
+
+//POST, DELETE FOR TOURNAMENTS EXTRA ORGANIZERS
+//NEED TO DO THE TESTS
+router.post("/:id/organizers", decryptToken, (request, response) => {
+    try {
+        const toTake = [
+            'id',
+        ]; 
+        
+        const toTakeList = getIntParams(toTake, request, response);
+        if (!toTakeList) {
+            return;
+        }
+
+        const tournament = tournamentsModel.getTournamentById(toTakeList.id)
+        if (!tournament) {
+            return response.status(404).json({ error: "tournament not found" });
+        }
+
+        if (request.user.id !== tournament.organizer) {
+            return response.status(403).json({ error: "only the organizer can add support organizers" });
+        }
+
+        const userToAddInfo = usersModel.getUserById(request.organizerToAdd)
+        if (userToAddInfo.role !== "organizer") {
+            return response.status(403).json({ error: "only organizers can be added as support organizers"});
+        }
+
+        if(userToAddInfo.id === tournament.organizer) {
+            return response.status(403).json({ error: "The organizer cannot be added as a support organizer" });
+        }
+
+        if(tournamentsModel.isTournamentSupport(toTakeList.id, request.organizerToAdd)) {
+            return response.status(400).json({ error: "User is already a support organizer of this tournament" });
+        }
+
+        tournamentsModel.registerTournamentSupport(toTakeList.id, request.user.id)
+        response.status(201).json({ message: "Support organizer registered to tournament successfully" })
+    }catch(err) {
+        // Si el error es de SQLite por intentar apuntarse dos veces (UNIQUE constraint)
+        // Can happen for race conditions
+        if (err.message.includes('UNIQUE')) {
+            return response.status(400).json({ error: 'user already registered' });
+        }
+
+        console.error(err);
+        response.status(500).json({ error: err.message });
+    } 
+})
+
+router.delete('/:id/organizers/:userId', decryptToken, (request, response) => {
+    try {
+        const toTake = [
+            'id',
+            'userId'
+        ]; 
+        
+        const toTakeList = getIntParams(toTake, request, response);
+        if (!toTakeList) {
+            return;
+        }
+        
+        const tournament = tournamentsModel.getTournamentById(toTakeList.id)
+        if (!tournament) {
+            return response.status(404).json({ error: "tournament not found" });
+        }
+        
+        if(request.user.id !== tournament.organizer) {
+            return response.status(403).json({ error: "only the organizer can manage support organizers" });
+        }
+
+        const isSupportOrganizer = tournamentsModel.isTournamentSupport(toTakeList.id, toTakeList.userId)
+        if (!isSupportOrganizer) {
+            return response.status(404).json({ error: "user is not registered as a support organizer in this tournament" });
+        }
+
+        tournamentsModel.unregisterTournamentSupport(toTakeList.id, toTakeList.userId)
+        response.json("User unregistered successfully");
+    } catch (err) {
+        response.status(500).json({error: err.message})
+    }
+})
+
 
 module.exports = router

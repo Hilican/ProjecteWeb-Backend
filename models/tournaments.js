@@ -93,12 +93,23 @@ const changeTournamentState = (id, data) => {
     return info.changes > 0;
 };
 
-const registerOnTournament = (tournamentId, userId) => {
+// -- TOURNAMENT REGISTRATIONS --
+const getTournamentRegistrationIds = (tournamentId) => {
+    const q = db.prepare(`SELECT user_id FROM tournament_registrations WHERE tournament_id = ?`)
+    return q.all(tournamentId)
+}
+
+const getTournamentRegistrationUsernames = (tournamentId) => {
+    const q = db.prepare(`SELECT u.username FROM tournament_registrations tr JOIN users u ON tr.user_id = u.id WHERE tr.tournament_id = ?`)
+    return q.all(tournamentId)
+}
+
+const registerUserOnTournament = (tournamentId, userId) => {
     const q = db.prepare(`INSERT INTO tournament_registrations (user_id, tournament_id) VALUES (?, ?)`)
     q.run(userId, tournamentId)
 }
 
-const unregisterOnTournament = (tournamentId, userId) => {
+const unregisterUserFromTournament = (tournamentId, userId) => {
     const q = db.prepare(`DELETE FROM tournament_registrations WHERE user_id = ? AND tournament_id = ?`)
     q.run(userId, tournamentId)
 }
@@ -108,6 +119,39 @@ const isRegistered = (tournamentId, userId) => {
     return q.get(userId, tournamentId) !== undefined;
 }
 
-module.exports = { getAllTournaments, getTournamentById, getTournamentByName, getTournamentParticipants,
+// -- TOURNAMENT ORGANIZERS --
+const getTournamentSupportIds = (tournamentId) => {
+    const q = db.prepare(`SELECT user_id FROM tournament_organizers WHERE tournament_id = ?`)
+    return q.all(tournamentId)
+}
+
+const getTournamentSupportUsernames = (tournamentId) => {
+    const q = db.prepare(`SELECT u.username FROM tournament_organizers to JOIN users u ON to.user_id = u.id WHERE to.tournament_id = ?`)
+    return q.all(tournamentId)
+}
+
+const registerTournamentSupport = (tournamentId, userId) => {
+    const q = db.prepare(`INSERT INTO tournament_organizers (user_id, tournament_id) VALUES (?, ?)`)
+    q.run(userId, tournamentId)
+}
+
+const unregisterTournamentSupport = (tournamentId, userId) => {
+    const q = db.prepare(`DELETE FROM tournament_organizers WHERE user_id = ? AND tournament_id = ?`)
+    q.run(userId, tournamentId)
+}
+
+const isTournamentSupport = (tournamentId, userId) => {
+    const q = db.prepare(`SELECT * FROM tournament_organizers WHERE user_id = ? AND tournament_id = ?`)
+    return q.get(userId, tournamentId) !== undefined;
+}
+
+module.exports = { 
+    getAllTournaments, getTournamentById, getTournamentByName, getTournamentParticipants,
     createTournament, deleteTournamentById, changeTournamentState,
-    registerOnTournament, unregisterOnTournament, isRegistered}
+    // -- TOURNAMENT REGISTRATIONS --
+    getTournamentRegistrationIds, getTournamentRegistrationUsernames,
+    registerUserOnTournament, unregisterUserFromTournament, isRegistered,
+    // -- TOURNAMENT ORGANIZERS --
+    getTournamentSupportIds, getTournamentSupportUsernames,
+    registerTournamentSupport, unregisterTournamentSupport, isTournamentSupport
+}

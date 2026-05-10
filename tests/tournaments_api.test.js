@@ -143,7 +143,7 @@ describe('simple interactions with tournament list', () => {
         let tournament = tournamentsModel.getTournamentByName('ToRegister')
         
         const result = await api
-            .post(`/api/tournaments/${tournament.id}/register`)
+            .post(`/api/tournaments/${tournament.id}/participants`)
             .set('Authorization', `Bearer ${token}`)
             .expect(201)
             .expect('Content-Type', /application\/json/)
@@ -151,14 +151,14 @@ describe('simple interactions with tournament list', () => {
         assert.strictEqual(result.body.message, "User registered to tournament successfully")
 
         await api
-            .post(`/api/tournaments/${tournament.id}/register`)
+            .post(`/api/tournaments/${tournament.id}/participants`)
             .set('Authorization', `Bearer ${token}`)
             .expect(400)
             .expect('Content-Type', /application\/json/)
 
         //Without token
         await api
-            .post(`/api/tournaments/${tournament.id}/register`)
+            .post(`/api/tournaments/${tournament.id}/participants`)
             .expect(401)
             .expect('Content-Type', /application\/json/)
 
