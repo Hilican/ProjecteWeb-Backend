@@ -22,12 +22,13 @@ const decryptToken = (request, response, next) => {
 
     try {
         const decodedToken = jwt.verify(getTokenFrom(request), process.env.SECRET)
-        if(!decodedToken.id || !decodedToken.role) {
+        if(!decodedToken.id || !decodedToken.role || !decodedToken.username) {
             return response.status(401).json({error: "invalid token"});
         }
         request.user = {
             id: decodedToken.id,
-            role: decodedToken.role
+            role: decodedToken.role,
+            username: decodedToken.username
         }
         next();
     } catch (error) {

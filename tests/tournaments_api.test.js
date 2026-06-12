@@ -57,7 +57,7 @@ describe('simple interactions with tournament list', () => {
             .expect('Content-Type', /application\/json/);
             
         const responseKeys = Object.keys(result.body);
-        assert.strictEqual(responseKeys.length, 11);
+        assert.strictEqual(responseKeys.length, 13);
         assert.strictEqual(result.body.id, tournamentInfo.id);
         assert.strictEqual(result.body.name, tournamentInfo.name);
         assert.strictEqual(result.body.description, tournamentInfo.description);
@@ -71,7 +71,7 @@ describe('simple interactions with tournament list', () => {
 
         assert.strictEqual(result.body.length, 2)
         const responseKeys = Object.keys(result.body[0]);
-        assert.strictEqual(responseKeys.length, 11);
+        assert.strictEqual(responseKeys.length, 13);
     })
 
     test('Organizer creates one tournaments', async () => {

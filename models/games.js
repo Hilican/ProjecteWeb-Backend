@@ -104,8 +104,24 @@ const modifyGame = (id, data) => {
     return info.changes > 0;
 }
 
+//--- FOR FRONT END USE ---
+const getAllGamesFromTournamentExtended = (tournamentId) => {
+    const q = db.prepare(`
+        SELECT 
+            g.*, 
+            u1.username AS player1Name, 
+            u2.username AS player2Name
+        FROM games g
+        LEFT JOIN users u1 ON g.player1 = u1.id
+        LEFT JOIN users u2 ON g.player2 = u2.id
+        WHERE g.tournamentId = ?
+    `);
+    const games = q.all(tournamentId)
+    return games;
+}
 
 module.exports = { 
     getAllGames, getAllGamesFromTournament, getAllGamesFromUser, getGameById, getAllGamesFromTournamentFromUser,
-    createGame, removeGame, modifyGame
+    createGame, removeGame, modifyGame, 
+    getAllGamesFromTournamentExtended,
  };

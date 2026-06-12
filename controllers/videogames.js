@@ -44,7 +44,7 @@ videogamesRouter.post("/", decryptToken, async (request, response) => {
         if (!hasAll(allowedFields, request)) {
             return response.status(400).json({ 
                 error: "Missing data", 
-                message: `At least one of these fields is required`,
+                message: `name and description fields are required`,
                 validFields: allowedFields
             });
         }

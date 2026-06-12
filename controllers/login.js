@@ -7,7 +7,7 @@ const loginRouter = require('express').Router()
 loginRouter.post("/", async (request, response) => {
     const {username, password} = request.body;
 
-    const user = usersModel.getUserByUsername(username);
+    const user = usersModel.getAllUserByUsername(username);
     const passwordCorrect = user
         ? await bcrypt.compare(password, user.passwordHash)
         : false;

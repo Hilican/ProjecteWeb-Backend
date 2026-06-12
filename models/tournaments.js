@@ -6,6 +6,16 @@ const getAllTournaments = () => {
     return tournament
 }
 
+const getAllOrganizerTournamentsById = (organizerId) => {
+    const query = db.prepare("SELECT * FROM tournaments WHERE organizer = ?")
+    return query.all(organizerId)
+}
+
+const getAllOrganizerTournamentsByName = (organizerName) => {
+    const query = db.prepare("SELECT * FROM tournaments WHERE organizer = (SELECT id FROM users WHERE username = ?)")
+    return query.all(organizerName)
+}
+
 const getTournamentById = id => {
     const query = db.prepare("SELECT * FROM tournaments WHERE id=?")
     const tournament = query.get(id);
@@ -65,7 +75,6 @@ const changeTournamentState = (id, data) => {
         stateTournament 
     } = data;
 
-    // Preparamos la consulta SQL. 
     // IMPORTANTE: No incluimos ni "id" ni "name" en el SET para que no se puedan cambiar.
     const q = db.prepare(`
         UPDATE tournaments 
@@ -94,6 +103,26 @@ const changeTournamentState = (id, data) => {
 };
 
 // -- TOURNAMENT REGISTRATIONS --
+const getUserRegistrationsByUsername = (username) => {
+    const q = db.prepare(`
+        SELECT t.* FROM tournament_registrations tr
+        INNER JOIN tournaments t ON tr.tournament_id = t.id
+        INNER JOIN users u ON tr.user_id = u.id
+        WHERE u.username = ?
+    `);
+    return q.all(username);
+}
+
+const isRegisteredById = (tournamentId, userId) => {
+    const q = db.prepare(`SELECT * FROM tournament_registrations WHERE user_id = ? AND tournament_id = ?`)
+    return q.get(userId, tournamentId) !== undefined;
+}
+
+const isRegisteredByUsername = (tournamentId, username) => {
+    const q = db.prepare(`SELECT * FROM tournament_registrations tr JOIN users u ON tr.user_id = u.id WHERE u.username = ? AND tr.tournament_id = ?`)
+    return q.get(username, tournamentId) !== undefined;
+}
+
 const getTournamentRegistrationIds = (tournamentId) => {
     const q = db.prepare(`SELECT user_id FROM tournament_registrations WHERE tournament_id = ?`)
     return q.all(tournamentId)
@@ -114,11 +143,6 @@ const unregisterUserFromTournament = (tournamentId, userId) => {
     q.run(userId, tournamentId)
 }
 
-const isRegistered = (tournamentId, userId) => {
-    const q = db.prepare(`SELECT * FROM tournament_registrations WHERE user_id = ? AND tournament_id = ?`)
-    return q.get(userId, tournamentId) !== undefined;
-}
-
 // -- TOURNAMENT ORGANIZERS --
 const getTournamentSupportIds = (tournamentId) => {
     const q = db.prepare(`SELECT user_id FROM tournament_organizers WHERE tournament_id = ?`)
@@ -128,6 +152,16 @@ const getTournamentSupportIds = (tournamentId) => {
 const getTournamentSupportUsernames = (tournamentId) => {
     const q = db.prepare(`SELECT u.username FROM tournament_organizers to JOIN users u ON to.user_id = u.id WHERE to.tournament_id = ?`)
     return q.all(tournamentId)
+}
+
+const getAllOrganizerSupportTournamentsByName = (organizerSupportName) => {
+    const query = db.prepare(`
+        SELECT t.* FROM tournament_organizers to_sup
+        JOIN users u ON to_sup.user_id = u.id
+        JOIN tournaments t ON to_sup.tournament_id = t.id
+        WHERE u.username = ?
+    `)
+    return query.all(organizerSupportName)
 }
 
 const registerTournamentSupport = (tournamentId, userId) => {
@@ -145,13 +179,47 @@ const isTournamentSupport = (tournamentId, userId) => {
     return q.get(userId, tournamentId) !== undefined;
 }
 
+//--- FOR FRONT END USE ---
+const getAllTournamentsExtended = () => {
+    const q = db.prepare(`
+        SELECT 
+            t.*, 
+            v.name AS videogameName, 
+            u.username AS organizerName
+        FROM tournaments t
+        INNER JOIN videogames v ON t.videogame = v.id
+        INNER JOIN users u ON t.organizer = u.id
+    `);
+
+    return q.all();
+};
+
+const getTournamentExtendedById = id => {
+    const q = db.prepare(`
+        SELECT 
+            t.*, 
+            v.name AS videogameName, 
+            u.username AS organizerName
+        FROM tournaments t
+        INNER JOIN videogames v ON t.videogame = v.id
+        INNER JOIN users u ON t.organizer = u.id
+        WHERE t.id = ?
+    `);
+    const tournament = q.get(id);
+    return tournament
+};
+
 module.exports = { 
     getAllTournaments, getTournamentById, getTournamentByName, getTournamentParticipants,
+    getAllTournamentsExtended, getTournamentExtendedById,
     createTournament, deleteTournamentById, changeTournamentState,
+    getAllOrganizerTournamentsById, getAllOrganizerTournamentsByName,
     // -- TOURNAMENT REGISTRATIONS --
+    getUserRegistrationsByUsername,
     getTournamentRegistrationIds, getTournamentRegistrationUsernames,
-    registerUserOnTournament, unregisterUserFromTournament, isRegistered,
+    registerUserOnTournament, unregisterUserFromTournament, isRegisteredById, isRegisteredByUsername,
     // -- TOURNAMENT ORGANIZERS --
     getTournamentSupportIds, getTournamentSupportUsernames,
+    getAllOrganizerSupportTournamentsByName,
     registerTournamentSupport, unregisterTournamentSupport, isTournamentSupport
 }

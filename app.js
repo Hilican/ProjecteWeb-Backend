@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors")
 
 const { initDb } = require("./models")
 const tournamentsRouter = require("./controllers/tournaments");
@@ -6,9 +7,18 @@ const usersRouter = require("./controllers/users");
 const loginRouter = require("./controllers/login");
 const videogamesRouter = require("./controllers/videogames");
 
+const crearAdmin = require("./utils/crearAdmin");
+const crearOrganizer = require("./utils/crearOrganizer");
+
 initDb()
 
+if (process.env.NODE_ENV !== 'test') { //No se bien porque pero da error los tests al poner esto, incluso poniendo "await"
+    crearAdmin();
+    crearOrganizer()
+}
+
 const app = express();
+app.use(cors())
 
 app.use(express.json())
 

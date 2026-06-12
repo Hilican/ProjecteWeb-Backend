@@ -60,7 +60,7 @@ describe('Create users tests', () => {
         const userToView = usersModel.getUserByUsername("user");
         
         const result = await api
-            .get(`/api/users/${userToView.id}`)
+            .get(`/api/users/id/${userToView.id}`)
             .expect(200)
             .expect('Content-Type', /application\/json/);
         
@@ -77,7 +77,7 @@ describe('Create users tests', () => {
     test('see a non-existing profile', async () => { 
         const idThatDoesntExist = 23789;
         await api
-            .get(`/api/users/${idThatDoesntExist}`)
+            .get(`/api/users/id/${idThatDoesntExist}`)
             .expect(404)
     })
 
@@ -160,7 +160,7 @@ describe('Create users tests (one for each role)', () => {
         }
         
         const result = await api
-            .patch(`/api/users/${user.id}`)
+            .patch(`/api/users/id/${user.id}`)
             .set('Authorization', `Bearer ${token}`)
             .send(toModify)
             .expect(200)
@@ -168,7 +168,7 @@ describe('Create users tests (one for each role)', () => {
 
         //Without token
         await api
-            .patch(`/api/users/${user.id}`)
+            .patch(`/api/users/id/${user.id}`)
             .send(toModify)
             .expect(401)
             .expect('Content-Type', /application\/json/)

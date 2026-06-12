@@ -20,7 +20,7 @@ const createUser = (user) => {
 
 const getUserByUsername = username => {
     const q = db.prepare(`
-        SELECT *
+        SELECT id, username, email, role
         FROM users
         WHERE username=?
     `);
@@ -31,7 +31,7 @@ const getUserByUsername = username => {
 
 const getUserByEmail = email => {
     const q = db.prepare(`
-        SELECT *
+        SELECT id, username, email, role
         FROM users
         WHERE email=?
     `);
@@ -63,6 +63,17 @@ const getAllUserById = id => {
     return user;
 }
 
+const getAllUserByUsername = username => {
+    const q = db.prepare(`
+        SELECT *
+        FROM users
+        WHERE username=?
+    `);
+
+    const user = q.get(username)
+    return user;
+}
+
 const getAllUsers = () => {
     const q = db.prepare(`
         SELECT username
@@ -84,6 +95,6 @@ const updateUser = (id, email, passwordHash) => {
 }
 module.exports = { 
     createUser, updateUser,
-    getUserByUsername, getUserById, getAllUserById, 
-    getUserByEmail, getAllUsers
+    getUserByUsername, getUserById, getUserByEmail,
+    getAllUserById, getAllUserByUsername, getAllUsers
 };

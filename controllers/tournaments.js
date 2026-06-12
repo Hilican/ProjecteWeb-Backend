@@ -5,7 +5,7 @@ const { getExistingParameters, hasAll, supportedTypes, createGames, getIntParams
 
 router.get("/", (request, response) => {
     try {
-        const tournaments = tournamentsModel.getAllTournaments()
+        const tournaments = tournamentsModel.getAllTournamentsExtended()
         response.json(tournaments);
     } catch (err) {
         response.status(500).json({error: err.message})
@@ -23,7 +23,7 @@ router.get('/:id', (request, response) => {
     }
 
     try {
-        const tournament = tournamentsModel.getTournamentById(toTakeList.id)
+        const tournament = tournamentsModel.getTournamentExtendedById(toTakeList.id)
 
         if(!tournament) return response.status(404).end()
 
@@ -63,7 +63,7 @@ router.get('/:id/games', (request, response) => {
     }
 
     try {
-        const tournamentGames = gamesModel.getAllGamesFromTournament(toTakeList.id)
+        const tournamentGames = gamesModel.getAllGamesFromTournamentExtended(toTakeList.id)
         if(!tournamentGames) return response.status(404).end()
         response.json(tournamentGames);
     } catch (err) {
@@ -206,14 +206,10 @@ router.delete("/:id", decryptToken, (request, response) => {
     } 
 })
 
-
 router.patch("/:id", decryptToken, (request, response) => {
     try {
         // Check tournament existence
-        const toTake = [
-            'id',
-        ]; 
-        
+        const toTake = [ 'id' ];
         const toTakeList = getIntParams(toTake, request, response);
         if (!toTakeList) {
             return;
@@ -260,6 +256,16 @@ router.patch("/:id", decryptToken, (request, response) => {
                 return response.status(400).json({ error: "New 'state tournament' not allowed" });
             }
         }
+        
+        if (existingParameters.videogame !== undefined) {
+            const videogame = videogamesModel.getVideogameByName(existingParameters.videogame);
+            if (!videogame) {
+                return response.status(400).json({ 
+                    error: 'videogame not found' 
+                });
+            }
+            request.body.videogame = videogame.id;
+        }
 
         // With the torunament from database as a base, we update the fields that are in the body of the request
         // And make the change in the database
@@ -274,10 +280,10 @@ router.patch("/:id", decryptToken, (request, response) => {
             return response.status(404).json({ error: "Could not update: Tournament not found" });
         }
 
-        response.status(200).json({ message: "Tournament updated successfully" });
+        return response.status(200).json({ message: "Tournament updated successfully" });
     }catch(err) {
         console.error(err);
-        response.status(500).json({ error: err.message });
+        return response.status(500).json({ error: err.message });
     } 
 })
 
@@ -385,7 +391,46 @@ router.patch("/:id/games/:gameId", decryptToken, (request, response) => {
     } 
 })
 
-//POST, DELETE FOR TOURNAMENTS USER INSCRIPTIONS
+//GET, POST, DELETE FOR TOURNAMENTS USER INSCRIPTIONS
+//NEED TO DO THE TESTS
+router.get("/user/:username", decryptToken, (request, response) => {
+    try {
+        if(request.params.username !== request.user.username) {
+            return response.status(403).json({ error: "You can't check this user registrations" });
+        }  
+        const userTournaments = tournamentsModel.getUserRegistrationsByUsername(request.params.username)
+        return response.status(200).json(userTournaments);  
+    }catch(err) {
+        console.error(err);
+        return response.status(500).json({ error: err.message });
+    } 
+})
+
+router.get("/:id/participants/:username", decryptToken, (request, response) => {
+    try {
+        const toTake = ['id'];
+        const toTakeList = getIntParams(toTake, request, response);
+        if (!toTakeList) {
+            return;
+        }
+        
+        if(request.params.username !== request.user.username) {
+            return response.status(403).json({ error: "You can't check this registration status" });
+        }
+        
+        const result = tournamentsModel.isRegisteredByUsername(toTakeList.id, request.user.username)
+        if (!result) {
+            return response.status(200).json({ isRegistered: false, message: "User is NOT registered" });
+        }
+
+        return response.status(200).json({ isRegistered: true, message: "User is registered" });
+        
+    }catch(err) {
+        console.error(err);
+        return response.status(500).json({ error: err.message });
+    } 
+})
+
 router.post("/:id/participants", decryptToken, (request, response) => {
     try {
         const toTake = [
@@ -441,7 +486,7 @@ router.delete('/:id/participants/:userId', decryptToken, (request, response) => 
             return response.status(404).json({ error: "tournament not found" });
         }
         
-        const isRegistered = tournamentsModel.isRegistered(toTakeList.id, toTakeList.userId)
+        const isRegistered = tournamentsModel.isRegisteredById(toTakeList.id, toTakeList.userId)
         if (!isRegistered) {
             return response.status(404).json({ error: "user not registered in tournament" });
         }
@@ -454,6 +499,42 @@ router.delete('/:id/participants/:userId', decryptToken, (request, response) => 
         response.json("User unregistered successfully");
     } catch (err) {
         response.status(500).json({error: err.message})
+    }
+})
+
+//NEED TO TEST
+router.delete('/:id/participants/username/:username', decryptToken, (request, response) => {
+    try {
+        const toTake = [ 'id' ]; 
+        const toTakeList = getIntParams(toTake, request, response);
+        if (!toTakeList) {
+            return;
+        }
+
+        const tournament = tournamentsModel.getTournamentById(toTakeList.id)
+        if (!tournament) {
+            return response.status(404).json({ error: "tournament not found" });
+        }
+        
+        const user = usersModel.getUserByUsername(request.params.username)
+        if(!user)
+        {
+            return response.status(404).json({ error: "User not found" });
+        }
+
+        const isRegistered = tournamentsModel.isRegisteredByUsername(toTakeList.id, user.username)
+        if (!isRegistered) {
+            return response.status(404).json({ error: "user not registered in tournament" });
+        }
+
+        if (request.user.id !== tournament.organizer && request.user.id !== user.id) {
+            return response.status(403).json({ error: "You can't unregister this user" });
+        }
+
+        tournamentsModel.unregisterUserFromTournament(toTakeList.id, user.id)
+        return response.json("User unregistered successfully");
+    } catch (err) {
+        return response.status(500).json({error: err.message})
     }
 })
 
@@ -506,6 +587,7 @@ router.post("/:id/organizers", decryptToken, (request, response) => {
     } 
 })
 
+//NEED TO DO THE TESTS
 router.delete('/:id/organizers/:userId', decryptToken, (request, response) => {
     try {
         const toTake = [
@@ -539,5 +621,26 @@ router.delete('/:id/organizers/:userId', decryptToken, (request, response) => {
     }
 })
 
+//NEED TO DO THE TESTS FOR ALL BELOW THIS
+router.get("/organizer/username/:username", decryptToken, (request, response) => {
+    try {
+        const { username } = request.params;
+        const user = usersModel.getUserByUsername(username)
+        if (!user) {
+            return response.status(404).json({ error: "user not found" });
+        }
+
+        if(request.user.role !== "admin" && request.user.username !== user.username) {
+            return response.status(403).json({error: "you can't see this user tournaments"});
+        }
+        
+        const tournaments = tournamentsModel.getAllOrganizerTournamentsByName(user.username)
+        const supportTournaments = tournamentsModel.getAllOrganizerSupportTournamentsByName(user.username)
+        return response.status(200).json({ tournaments, supportTournaments })
+    } catch (err) {
+        console.error(err);
+        response.status(500).json({ error: err.message });
+    }
+})
 
 module.exports = router

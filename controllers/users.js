@@ -64,7 +64,7 @@ usersRouter.post("/createUser", async (request, response) => {
     response.status(201).json(savedUser);
 })
 
-usersRouter.get("/:id", (request, response) => {
+usersRouter.get("/id/:id", (request, response) => {
     const toTake = [
         'id',
     ]; 
@@ -76,6 +76,19 @@ usersRouter.get("/:id", (request, response) => {
 
     try {
         const user = usersModel.getUserById(toTakeList.id)
+        if(!user) {
+            return response.status(404).end()
+        }
+        response.json(user);
+    } catch (err) {
+        response.status(500).json({error: err.message})
+    }
+})
+
+usersRouter.get("/username/:username", (request, response) => {
+    const { username } = request.params;
+    try {
+        const user = usersModel.getUserByUsername(username)
         if(!user) {
             return response.status(404).end()
         }
@@ -148,7 +161,7 @@ usersRouter.post("/createSpecialUser", decryptToken, async (request, response) =
     }
 })
 
-usersRouter.patch("/:id", decryptToken, async (request, response) => {
+usersRouter.patch("/id/:id", decryptToken, async (request, response) => {
     try {
         const toTake = [
             'id',
@@ -196,6 +209,54 @@ usersRouter.patch("/:id", decryptToken, async (request, response) => {
         }
         
         usersModel.updateUser(toTakeList.id, existingParameters.newEmail, passwordHash)
+        return response.status(200).json({ message: "User updated successfully" })
+    } catch (err) {
+        console.error(err);
+        response.status(500).json({ error: err.message });
+    }
+})
+
+//NEED to do tests FOR ALL BELOW THIS
+usersRouter.patch("/username/:username", decryptToken, async (request, response) => {
+    try {
+        const { username } = request.params;
+        const user = usersModel.getAllUserByUsername(username)
+        if (!user) {
+            return response.status(404).json({ error: "user not found" });
+        }
+
+        //Check if all fields are in the body of the request
+        const allowedFields = ['newPassword', 'newEmail'];
+        const existingParameters = getExistingParameters(allowedFields, request);
+        if (!existingParameters) {
+            return response.status(400).json({ 
+                error: "Missing data", 
+                message: `At least one of these fields is required`,
+                validFields: allowedFields
+            });
+        }
+
+        if(request.user.role !== "admin" && request.user.username !== user.username) {
+            return response.status(401).json({error: "you can't update this user"});
+        }
+
+        let passwordHash = null
+        if(existingParameters.newPassword)
+        {
+            const saltRounds = parseInt(process.env.SALT_ROUNDS, 10);
+            const passwordHash = await bcrypt.hash(existingParameters.newPassword, saltRounds);
+        }
+
+        if(existingParameters.newEmail) {
+            const existEmail = usersModel.getUserByEmail(existingParameters.newEmail);
+            if (existEmail) {
+                return response.status(400).json({ 
+                    error: 'email already on use' 
+                });
+            }
+        }
+        
+        usersModel.updateUser(user.id, existingParameters.newEmail, passwordHash)
         return response.status(200).json({ message: "User updated successfully" })
     } catch (err) {
         console.error(err);
