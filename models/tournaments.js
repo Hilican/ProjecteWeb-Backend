@@ -28,11 +28,6 @@ const getTournamentByName = name => {
     return tournament
 }
 
-const getTournamentParticipants = tournamentId => {
-    const q = db.prepare(`SELECT u.username FROM tournament_registrations tr JOIN users u ON tr.user_id = u.id WHERE tr.tournament_id = ?`)
-    return q.all(tournamentId)
-}
-
 const createTournament = (tournament) => {
     const {name, description, videogame, type, rounds, tournament_start_date,
     tournament_end_date, organizer} = tournament
@@ -179,7 +174,7 @@ const isTournamentSupport = (tournamentId, userId) => {
     return q.get(userId, tournamentId) !== undefined;
 }
 
-//--- FOR FRONT END USE ---
+//--- FOR FRONTEND USE ---
 const getAllTournamentsExtended = () => {
     const q = db.prepare(`
         SELECT 
@@ -209,9 +204,18 @@ const getTournamentExtendedById = id => {
     return tournament
 };
 
+const getTournamentSupportsExtended = (tournamentId) => {
+    const q = db.prepare(`SELECT u.username, torg.user_id FROM tournament_organizers torg JOIN users u ON torg.user_id = u.id WHERE torg.tournament_id = ?`)
+    return q.all(tournamentId)
+}
+
+const getTournamentRegistrationExtended = (tournamentId) => {
+    const q = db.prepare(`SELECT u.username, tr.user_id FROM tournament_registrations tr JOIN users u ON tr.user_id = u.id WHERE tr.tournament_id = ?`)
+    return q.all(tournamentId)
+}
+
 module.exports = { 
-    getAllTournaments, getTournamentById, getTournamentByName, getTournamentParticipants,
-    getAllTournamentsExtended, getTournamentExtendedById,
+    getAllTournaments, getTournamentById, getTournamentByName,
     createTournament, deleteTournamentById, changeTournamentState,
     getAllOrganizerTournamentsById, getAllOrganizerTournamentsByName,
     // -- TOURNAMENT REGISTRATIONS --
@@ -221,5 +225,8 @@ module.exports = {
     // -- TOURNAMENT ORGANIZERS --
     getTournamentSupportIds, getTournamentSupportUsernames,
     getAllOrganizerSupportTournamentsByName,
-    registerTournamentSupport, unregisterTournamentSupport, isTournamentSupport
+    registerTournamentSupport, unregisterTournamentSupport, isTournamentSupport,
+    // -- EXTENDED --
+    getAllTournamentsExtended, getTournamentExtendedById, getTournamentSupportsExtended,
+    getTournamentRegistrationExtended,
 }

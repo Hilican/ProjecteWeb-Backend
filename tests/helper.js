@@ -18,6 +18,13 @@ const organizerData = {
     role: "organizer"
 };
 
+const organizer2Data = {
+    username: "organizer2",
+    password: "organizer2",
+    email: "organizer2@example.com",
+    role: "organizer"
+};
+
 const userData = {
     username: "user",
     password: "user1",
@@ -81,7 +88,7 @@ const loginHelper = async (api, logInData, expectedStatus = 200) => {
 };
 
 module.exports = { 
-    adminData, organizerData, userData,
+    adminData, organizerData, organizer2Data, userData,
     getDataToCreateUser, getLoginData,
     videogameData, tournamentData,
     userPlayer1Data, userPlayer2Data,

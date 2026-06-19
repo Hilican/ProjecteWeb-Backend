@@ -15,7 +15,6 @@ usersRouter.get("/", (request, response) => {
     }
 })
 
-//Podria ser el /signUp, lo dejo asi por simplificacion
 usersRouter.post("/createUser", async (request, response) => {
     //Check if all fields are in the body of the request
     const allowedFields = [

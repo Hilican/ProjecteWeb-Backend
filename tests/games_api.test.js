@@ -54,6 +54,19 @@ describe('simple interactions with games of a Tournament', () => {
         assert.strictEqual(result.body.id, game.id)
     })
 
+    test('See one game', async () => {
+        const tournament = tournamentsModel.getTournamentByName(testHelper.tournamentData.name)
+        const games = gamesModel.getAllGamesFromTournament(tournament.id)
+        const gameId = games[0].id
+        const result = await api
+            .get(`/api/tournaments/games/${gameId}`)
+            .expect(200)
+            .expect('Content-Type', /application\/json/);
+        
+        const game = gamesModel.getGameById(gameId)
+        assert.strictEqual(result.body.id, game.id)
+    })
+
     test('Define a game of a Tournament', async () => {
         const tournament = tournamentsModel.getTournamentByName(testHelper.tournamentData.name)
         const games = gamesModel.getAllGamesFromTournament(tournament.id)
@@ -66,17 +79,21 @@ describe('simple interactions with games of a Tournament', () => {
         const user2 = usersModel.getUserByUsername(testHelper.userPlayer2Data.username);
 
         const toModify = {
+            state: "ToPlay",
             player1: user1.id,
             player2: user2.id,
         }
 
         const result = await api
-            .patch(`/api/tournaments/${tournament.id}/games/${gameId}`)
+            .patch(`/api/tournaments/games/${gameId}`)
             .set('Authorization', `Bearer ${token}`)
             .send(toModify)
             .expect(200)
             .expect('Content-Type', /application\/json/);
         
-        assert.strictEqual(result.body.message, "Tournament game updated successfully");
+        assert.strictEqual(result.body.message, "Tournament game updated successfully")
+        assert.strictEqual(games[0].state, "ToDefinePlayers")
+        const game = gamesModel.getGameById(gameId)
+        assert.strictEqual(game.state, "ToPlay")
     })
 })
