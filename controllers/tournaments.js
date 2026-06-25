@@ -416,7 +416,7 @@ router.get("/user/username/:username", decryptToken, (request, response) => {
             return response.status(403).json({ error: "You can't check this user registrations" });
         }  
         const userTournaments = tournamentsModel.getUserRegistrationsByUsername(request.params.username)
-        return response.status(200).json({userTournaments});  
+        return response.status(200).json(userTournaments);  
     }catch(err) {
         console.error(err);
         return response.status(500).json({ error: err.message });
@@ -448,6 +448,35 @@ router.get("/organizer/username/:username", decryptToken, (request, response) =>
 
 //POST, DELETE FOR TOURNAMENTS INSCRIPTIONS
 //GET TOURNAMENTS PARTICIPANTS is public (above in this file)
+router.get('/:id/participants/username/:username', decryptToken, (request, response) => {
+    try {
+        const toTake = [ 'id' ]; 
+        const toTakeList = getIntParams(toTake, request, response);
+        if (!toTakeList) {
+            return;
+        }
+
+        const tournament = tournamentsModel.getTournamentById(toTakeList.id)
+        if (!tournament) {
+            return response.status(404).json({ error: "tournament not found" });
+        }
+        
+        const user = usersModel.getUserByUsername(request.params.username)
+        if(!user)
+        {
+            return response.status(404).json({ error: "User not found" });
+        }
+
+        const isRegistered = tournamentsModel.isRegisteredByUsername(toTakeList.id, user.username)
+        if (!isRegistered) {
+            return response.json({ isRegistered : false });
+        }
+        return response.json({isRegistered : true});
+    } catch (err) {
+        return response.status(500).json({error: err.message})
+    }
+})
+
 router.post("/:id/participants", decryptToken, (request, response) => {
     try {
         const toTake = [
