@@ -416,7 +416,7 @@ router.get("/user/username/:username", decryptToken, (request, response) => {
             return response.status(403).json({ error: "You can't check this user registrations" });
         }  
         const userTournaments = tournamentsModel.getUserRegistrationsByUsername(request.params.username)
-        return response.status(200).json(userTournaments);  
+        return response.status(200).json({userTournaments});  
     }catch(err) {
         console.error(err);
         return response.status(500).json({ error: err.message });

@@ -6,6 +6,7 @@ const app = require("../app");
 const { usersModel, videogamesModel, tournamentsModel, gamesModel } = require("../models")
 const db = require("../utils/db");
 const testHelper = require("./helper");
+const { log } = require("node:console");
 
 
 const api = supertest(app);
@@ -419,7 +420,6 @@ describe('simple interactions with tournament list', () => {
         const tournament = tournamentsModel.getTournamentByName(newTournament.name)
         const games = gamesModel.getAllGamesFromTournamentExtended(tournament.id)
         let game = games[0]
-        console.log(game)
         const toModify = {
             state: "ToPlay"
         }
