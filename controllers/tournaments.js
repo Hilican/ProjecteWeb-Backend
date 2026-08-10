@@ -1,7 +1,10 @@
+import { z } from 'zod';
+
 const router = require("express").Router()
 const { tournamentsModel, videogamesModel, gamesModel, usersModel} = require("../models")
 const { decryptToken } = require("../utils/middleware")
-const { getExistingParameters, hasAll, supportedTypes, createGames, getIntParams } = require("../utils/helper");
+const { VALID_T_TYPES, createGames } = require("../utils/gamesCreationEngine");
+const schemas = require("../utils/valuesSchemas")
 
 router.get("/", (request, response) => {
     try {
@@ -146,10 +149,20 @@ router.post("/", decryptToken, (request, response) => {
             "tournament_end_date"
         ];
         
+        //IN PROGRESS,
+        schemas.nonEmptyString.parse(request.body.name)
+        schemas.nonEmptyString.parse(request.body.description)
+        schemas.positiveNumber.parse(request.body.videogame)
+        schemas.nonEmptyString.parse(request.body.type)
+        schemas.positiveNumber.parse(request.body.rounds)
+        schemas.validDate.parse(request.body.tournament_start_date)
+        schemas.validDate.parse(request.body.tournament_end_date)
+        
+
         if (!hasAll(allowedFields, request)) {
             return response.status(400).json({ error: "All fields are required" });
         }
-        
+
         //Checking if game exists
         const videogame = videogamesModel.getVideogameByName(request.body.videogame)
         if (!videogame) {
@@ -167,7 +180,7 @@ router.post("/", decryptToken, (request, response) => {
         }
         
         //Por ahora solo se puede crear el tipo "torneig"
-        if (!supportedTypes.includes(request.body.type)) {
+        if (!VALID_T_TYPES.includes(request.body.type)) {
             return response.status(400).json({ 
                 error: 'This type of tournament isn\'t supported' 
             });

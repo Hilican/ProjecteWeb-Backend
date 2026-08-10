@@ -1,3 +1,4 @@
+const { VALID_ROLES : ROLES } = require("./dbConstants")
 const jwt = require("jsonwebtoken");
 
 const getTokenFrom = request => {
@@ -22,7 +23,7 @@ const decryptToken = (request, response, next) => {
 
     try {
         const decodedToken = jwt.verify(getTokenFrom(request), process.env.SECRET)
-        if(!decodedToken.id || !decodedToken.role || !decodedToken.username) {
+        if(!decodedToken.id || !ROLES.includes(decodedToken.role) || !decodedToken.username ) {
             return response.status(401).json({error: "invalid token"});
         }
         request.user = {

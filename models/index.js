@@ -4,7 +4,6 @@ const usersModel = require("./users")
 const videogamesModel = require("./videogames")
 const gamesModel = require("./games")
 
-
 const initDb = () => {
     db.exec(`
         CREATE TABLE IF NOT EXISTS users(
@@ -12,7 +11,7 @@ const initDb = () => {
             username TEXT UNIQUE,
             passwordHash TEXT,
             email TEXT UNIQUE,
-            role TEXT           -- "user", "organizer", "admin"
+            role TEX
             )
             `)
             
@@ -22,13 +21,12 @@ const initDb = () => {
             name TEXT UNIQUE,
             description TEXT,
             videogame INTEGER,
-            type TEXT,                  -- "torneig", "lliga""
+            type TEXT,
             rounds INTEGER,             -- número de rondas del torneo, 0 si el torneo no tiene rondas
             tournament_start_date TEXT,
             tournament_end_date TEXT,
-            stateRegistration TEXT,    -- "PerObrir", "Oberta", "Tancada"
             organizer INTEGER,
-            stateTournament TEXT,       -- "Anunciat", "inscripcions obertes", "en curs", "finalitzat"
+            stateTournament TEXT,
             FOREIGN KEY(organizer) REFERENCES users(id),
             FOREIGN KEY(videogame) REFERENCES videogames(id)
         )
@@ -39,7 +37,7 @@ const initDb = () => {
             id INTEGER PRIMARY KEY,
             user_id INTEGER,
             tournament_id INTEGER,
-            status TEXT DEFAULT 'pendiente', -- "pendiente", "confirmado", "finalizado".
+            status TEXT DEFAULT 'PENDING',
             
             -- Relaciones con las otras tablas
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
