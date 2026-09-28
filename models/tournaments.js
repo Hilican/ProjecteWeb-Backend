@@ -1,34 +1,34 @@
 const db = require("../utils/db")
 
-const getAllTournaments = () => {
+const getAllTournaments = async () => {
     const query = db.prepare("SELECT * FROM tournaments")
     const tournament = query.all();
     return tournament
 }
 
-const getAllOrganizerTournamentsById = (organizerId) => {
+const getAllOrganizerTournamentsById = async (organizerId) => {
     const query = db.prepare("SELECT * FROM tournaments WHERE organizer = ?")
     return query.all(organizerId)
 }
 
-const getAllOrganizerTournamentsByName = (organizerName) => {
+const getAllOrganizerTournamentsByName = async (organizerName) => {
     const query = db.prepare("SELECT * FROM tournaments WHERE organizer = (SELECT id FROM users WHERE username = ?)")
     return query.all(organizerName)
 }
 
-const getTournamentById = id => {
+const getTournamentById = async (id) => {
     const query = db.prepare("SELECT * FROM tournaments WHERE id=?")
     const tournament = query.get(id);
     return tournament
 }
 
-const getTournamentByName = name => {
+const getTournamentByName = async (name) => {
     const query = db.prepare("SELECT * FROM tournaments WHERE name=?")
     const tournament = query.get(name);
     return tournament
 }
 
-const createTournament = (tournament) => {
+const createTournament = async (tournament) => {
     const {name, description, videogame, type, rounds, tournament_start_date,
     tournament_end_date, organizer} = tournament
     const q = db.prepare(
@@ -55,12 +55,12 @@ const createTournament = (tournament) => {
     return returnTournament
 }
 
-const deleteTournamentById = id => {
+const deleteTournamentById = async (id) => {
     const q = db.prepare(`DELETE FROM tournaments WHERE id=?`)
     q.run(id)
 }
 
-const changeTournamentState = (id, data) => {
+const changeTournamentState = async (id, data) => {
     const { 
         description, 
         videogame,  
@@ -98,7 +98,7 @@ const changeTournamentState = (id, data) => {
 };
 
 // -- TOURNAMENT REGISTRATIONS --
-const getUserRegistrationsByUsername = (username) => {
+const getUserRegistrationsByUsername = async (username) => {
     const q = db.prepare(`
         SELECT t.* FROM tournament_registrations tr
         INNER JOIN tournaments t ON tr.tournament_id = t.id
@@ -108,48 +108,48 @@ const getUserRegistrationsByUsername = (username) => {
     return q.all(username);
 }
 
-const isRegisteredById = (tournamentId, userId) => {
+const isRegisteredById = async (tournamentId, userId) => {
     const q = db.prepare(`SELECT * FROM tournament_registrations WHERE user_id = ? AND tournament_id = ?`)
     return q.get(userId, tournamentId) !== undefined;
 }
 
-const isRegisteredByUsername = (tournamentId, username) => {
+const isRegisteredByUsername = async (tournamentId, username) => {
     const q = db.prepare(`SELECT * FROM tournament_registrations tr JOIN users u ON tr.user_id = u.id WHERE u.username = ? AND tr.tournament_id = ?`)
     return q.get(username, tournamentId) !== undefined;
 }
 
-const getTournamentRegistrationIds = (tournamentId) => {
+const getTournamentRegistrationIds = async (tournamentId) => {
     const q = db.prepare(`SELECT user_id FROM tournament_registrations WHERE tournament_id = ?`)
     return q.all(tournamentId)
 }
 
-const getTournamentRegistrationUsernames = (tournamentId) => {
+const getTournamentRegistrationUsernames = async (tournamentId) => {
     const q = db.prepare(`SELECT u.username FROM tournament_registrations tr JOIN users u ON tr.user_id = u.id WHERE tr.tournament_id = ?`)
     return q.all(tournamentId)
 }
 
-const registerUserOnTournament = (tournamentId, userId) => {
+const registerUserOnTournament = async (tournamentId, userId) => {
     const q = db.prepare(`INSERT INTO tournament_registrations (user_id, tournament_id) VALUES (?, ?)`)
     q.run(userId, tournamentId)
 }
 
-const unregisterUserFromTournament = (tournamentId, userId) => {
+const unregisterUserFromTournament = async (tournamentId, userId) => {
     const q = db.prepare(`DELETE FROM tournament_registrations WHERE user_id = ? AND tournament_id = ?`)
     q.run(userId, tournamentId)
 }
 
 // -- TOURNAMENT ORGANIZERS --
-const getTournamentSupportIds = (tournamentId) => {
+const getTournamentSupportIds = async (tournamentId) => {
     const q = db.prepare(`SELECT user_id FROM tournament_organizers WHERE tournament_id = ?`)
     return q.all(tournamentId)
 }
 
-const getTournamentSupportUsernames = (tournamentId) => {
+const getTournamentSupportUsernames = async (tournamentId) => {
     const q = db.prepare(`SELECT u.username FROM tournament_organizers to JOIN users u ON to.user_id = u.id WHERE to.tournament_id = ?`)
     return q.all(tournamentId)
 }
 
-const getAllOrganizerSupportTournamentsByName = (organizerSupportName) => {
+const getAllOrganizerSupportTournamentsByName = async (organizerSupportName) => {
     const query = db.prepare(`
         SELECT t.* FROM tournament_organizers to_sup
         JOIN users u ON to_sup.user_id = u.id
@@ -159,23 +159,23 @@ const getAllOrganizerSupportTournamentsByName = (organizerSupportName) => {
     return query.all(organizerSupportName)
 }
 
-const registerTournamentSupport = (tournamentId, userId) => {
+const registerTournamentSupport = async (tournamentId, userId) => {
     const q = db.prepare(`INSERT INTO tournament_organizers (user_id, tournament_id) VALUES (?, ?)`)
     q.run(userId, tournamentId)
 }
 
-const unregisterTournamentSupport = (tournamentId, userId) => {
+const unregisterTournamentSupport = async (tournamentId, userId) => {
     const q = db.prepare(`DELETE FROM tournament_organizers WHERE user_id = ? AND tournament_id = ?`)
     q.run(userId, tournamentId)
 }
 
-const isTournamentSupport = (tournamentId, userId) => {
+const isTournamentSupport = async (tournamentId, userId) => {
     const q = db.prepare(`SELECT * FROM tournament_organizers WHERE user_id = ? AND tournament_id = ?`)
     return q.get(userId, tournamentId) !== undefined;
 }
 
 //--- FOR FRONTEND USE ---
-const getAllTournamentsExtended = () => {
+const getAllTournamentsExtended = async () => {
     const q = db.prepare(`
         SELECT 
             t.*, 
@@ -189,7 +189,7 @@ const getAllTournamentsExtended = () => {
     return q.all();
 };
 
-const getTournamentExtendedById = id => {
+const getTournamentExtendedById = async (id) => {
     const q = db.prepare(`
         SELECT 
             t.*, 
@@ -204,12 +204,12 @@ const getTournamentExtendedById = id => {
     return tournament
 };
 
-const getTournamentSupportsExtended = (tournamentId) => {
+const getTournamentSupportsExtended = async (tournamentId) => {
     const q = db.prepare(`SELECT u.username, torg.user_id FROM tournament_organizers torg JOIN users u ON torg.user_id = u.id WHERE torg.tournament_id = ?`)
     return q.all(tournamentId)
 }
 
-const getTournamentRegistrationExtended = (tournamentId) => {
+const getTournamentRegistrationExtended = async (tournamentId) => {
     const q = db.prepare(`SELECT u.username, tr.user_id FROM tournament_registrations tr JOIN users u ON tr.user_id = u.id WHERE tr.tournament_id = ?`)
     return q.all(tournamentId)
 }

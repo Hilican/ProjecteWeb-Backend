@@ -38,4 +38,18 @@ const decryptToken = (request, response, next) => {
     }
 }
 
-module.exports = { decryptToken };
+const validateParams = (schema) => (req, res, next) => {
+    const result = schema.safeParse(req.params);
+
+    if (!result.success) {
+        const campoConError = result.error.issues[0]?.path[0] || 'desconocido';
+        return res.status(400).json({
+            error: `Valor inválido en el parámetro: ${campoConError}`,
+            detalles: result.error.issues
+        });
+    }
+    req.params = result.data;
+    next();
+};
+
+module.exports = { decryptToken, validateParams};

@@ -6,69 +6,49 @@ const { decryptToken } = require("../utils/middleware")
 const { VALID_T_TYPES, createGames } = require("../utils/gamesCreationEngine");
 const schemas = require("../utils/valuesSchemas")
 
-router.get("/", (request, response) => {
+router.get("/", async (request, response) => {
     try {
-        const tournaments = tournamentsModel.getAllTournamentsExtended()
+        const tournaments = await tournamentsModel.getAllTournamentsExtended()
         response.json(tournaments);
     } catch (err) {
         response.status(500).json({error: err.message})
     }
 })
 
-router.get('/:id', (request, response) => {
-    const toTake = [
-        'id',
-    ]; 
-    
-    const toTakeList = getIntParams(toTake, request, response);
-    if (!toTakeList) {
-        return;
-    }
-
+router.get('/:id', async (request, response) => {
     try {
-        const tournament = tournamentsModel.getTournamentExtendedById(toTakeList.id)
-
+        const id = schemas.positiveInteger.parse(request.params.id)
+        const tournament = await tournamentsModel.getTournamentExtendedById(id)
         if(!tournament) return response.status(404).end()
-
         response.json(tournament);
     } catch (err) {
+        if(err instanceof z.ZodError) {
+            return response.status(400).json({ error: "Invalid tournament id" });
+        }
         response.status(500).json({error: err.message})
     }
 })
 
-router.get('/:id/participants', (request, response) => {
-    const toTake = [
-        'id',
-    ]; 
-    
-    const toTakeList = getIntParams(toTake, request, response);
-    if (!toTakeList) {
-        return;
-    }
-
+router.get('/:id/participants', async (request, response) => {
     try {
-        const tournamentParticipants = tournamentsModel.getTournamentRegistrationExtended(toTakeList.id)
+        const id = schemas.positiveInteger.parse(request.params.id)
+        const tournamentParticipants = await tournamentsModel.getTournamentRegistrationExtended(id)
         if (!tournamentParticipants) {
             return response.status(404).json({ error: "tournament not found" });
         }
         return response.json(tournamentParticipants);
     } catch (err) {
+        if(err instanceof z.ZodError) {
+            return response.status(400).json({ error: "Invalid tournament id" });
+        }
         response.status(500).json({error: err.message})
     }
 })
 
 router.get('/:id/games', (request, response) => {
-    const toTake = [
-        'id',
-    ]; 
-    
-    const toTakeList = getIntParams(toTake, request, response);
-    if (!toTakeList) {
-        return;
-    }
-
     try {
-        const tournamentGames = gamesModel.getAllGamesFromTournamentExtended(toTakeList.id)
+        const id = schemas.positiveInteger.parse(request.params.id)
+        const tournamentGames = gamesModel.getAllGamesFromTournamentExtended(id)
         if(!tournamentGames) return response.status(404).end()
         response.json(tournamentGames);
     } catch (err) {
@@ -76,33 +56,36 @@ router.get('/:id/games', (request, response) => {
     }
 })
 
-router.get('/:id/games/:gameId', (request, response) => {
+router.get('/:id/games/:gameId', async (request, response) => {
+    const paramsSchema = z.object({
+        id: schemas.positiveInteger,
+        gameId: schemas.positiveInteger,
+    });
     try {
-        const toTake = [
-            'id',
-            'gameId'
-        ]; 
-        
-        const toTakeList = getIntParams(toTake, request, response);
-        if (!toTakeList) {
-            return;
-        }
-    
-        const tournament = tournamentsModel.getTournamentById(toTakeList.id)
+        const { id, gameId } = paramsSchema.parse(request.params);
+
+        const tournament = await tournamentsModel.getTournamentById(id)
         if (!tournament) {
             return response.status(404).json({ error: "tournament not found" });
         }
-        const tournamentGame = gamesModel.getGameById(toTakeList.gameId)
-        
+
+        const tournamentGame = await gamesModel.getGameById(gameId)
         if (!tournamentGame) {
             return response.status(404).json({ error: "Game not found" });
         }
 
-        if (tournamentGame.tournamentId !== toTakeList.id) {
-            return response.status(404).json({ error: "game not found in this tournament" });
+        if (tournamentGame.tournamentId !== id) {
+            return response.status(404).json({ error: "game is not part of this tournament" });
         }
         response.json(tournamentGame);
     } catch (err) {
+        if(err instanceof z.ZodError) {
+            const campoConError = err.issues[0].path[0]; 
+            return response.status(400).json({ 
+                error: `valor inválido en el parámetro: ${campoConError}`,
+                detalles: err.issues
+            });
+        }
         response.status(500).json({error: err.message})
     }
 })
